@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package BlockStorage;
+
+message SerializeByte {
+	bytes buffer = 1;
+}
+
+message ReadResult{
+    int32 bytesread = 1;
+    bytes buffer = 2;
+    int32 err = 3;
+}
+
+message ReadRequest{
+    uint32 address = 1;
+}
+
+message WriteRequest{
+    uint32 address = 1;
+    bytes buffer = 2;
+}
+
+message WriteResult{
+    int32 nbytes = 1;
+    int32 err =2;
+}
+
+service BlockStorageService {
+    rpc rpc_read(ReadRequest) returns (ReadResult) {}
+    rpc rpc_write(WriteRequest) returns (WriteResult){}
+}
