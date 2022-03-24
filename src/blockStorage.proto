@@ -14,11 +14,15 @@ message ReadResult{
 
 message ReadRequest{
     uint32 address = 1;
+    uint32 size = 2;
+    uint32 offset = 3;
 }
 
 message WriteRequest{
     uint32 address = 1;
     bytes buffer = 2;
+    uint32 size = 3;
+    uint32 offset = 4;
 }
 
 message WriteResult{

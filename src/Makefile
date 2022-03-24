@@ -1,5 +1,5 @@
 CXX = g++ -lstdc++fs
-CPPFLAGS += -O3 -I/usr/local/include -I/users/dkumar27/.local/include -g -pthread `pkg-config --cflags --libs`
+CPPFLAGS += -O3 -I/usr/local/include -I/users/dkumar27/.local/include -g -pthread 
 CXXFLAGS += -std=c++17
 LDFLAGS += -L/users/dkumar27/.local/lib -L/usr/local/lib -g `pkg-config grpc++ grpc --cflags --libs`       \
            -Wl,--no-as-needed -lgrpc++_reflection -Wl,--as-needed \

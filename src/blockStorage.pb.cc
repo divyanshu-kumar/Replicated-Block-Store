@@ -45,7 +45,9 @@ struct ReadResultDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT ReadResultDefaultTypeInternal _ReadResult_default_instance_;
 constexpr ReadRequest::ReadRequest(
   ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized)
-  : address_(0u){}
+  : address_(0u)
+  , size_(0u)
+  , offset_(0u){}
 struct ReadRequestDefaultTypeInternal {
   constexpr ReadRequestDefaultTypeInternal()
     : _instance(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized{}) {}
@@ -58,7 +60,9 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT ReadRequestDefaultTypeInternal 
 constexpr WriteRequest::WriteRequest(
   ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized)
   : buffer_(&::PROTOBUF_NAMESPACE_ID::internal::fixed_address_empty_string)
-  , address_(0u){}
+  , address_(0u)
+  , size_(0u)
+  , offset_(0u){}
 struct WriteRequestDefaultTypeInternal {
   constexpr WriteRequestDefaultTypeInternal()
     : _instance(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized{}) {}
@@ -110,6 +114,8 @@ const ::PROTOBUF_NAMESPACE_ID::uint32 TableStruct_blockStorage_2eproto::offsets[
   ~0u,  // no _weak_field_map_
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::BlockStorage::ReadRequest, address_),
+  PROTOBUF_FIELD_OFFSET(::BlockStorage::ReadRequest, size_),
+  PROTOBUF_FIELD_OFFSET(::BlockStorage::ReadRequest, offset_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::BlockStorage::WriteRequest, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -118,6 +124,8 @@ const ::PROTOBUF_NAMESPACE_ID::uint32 TableStruct_blockStorage_2eproto::offsets[
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::BlockStorage::WriteRequest, address_),
   PROTOBUF_FIELD_OFFSET(::BlockStorage::WriteRequest, buffer_),
+  PROTOBUF_FIELD_OFFSET(::BlockStorage::WriteRequest, size_),
+  PROTOBUF_FIELD_OFFSET(::BlockStorage::WriteRequest, offset_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::BlockStorage::WriteResult, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -131,8 +139,8 @@ static const ::PROTOBUF_NAMESPACE_ID::internal::MigrationSchema schemas[] PROTOB
   { 0, -1, -1, sizeof(::BlockStorage::SerializeByte)},
   { 7, -1, -1, sizeof(::BlockStorage::ReadResult)},
   { 16, -1, -1, sizeof(::BlockStorage::ReadRequest)},
-  { 23, -1, -1, sizeof(::BlockStorage::WriteRequest)},
-  { 31, -1, -1, sizeof(::BlockStorage::WriteResult)},
+  { 25, -1, -1, sizeof(::BlockStorage::WriteRequest)},
+  { 35, -1, -1, sizeof(::BlockStorage::WriteResult)},
 };
 
 static ::PROTOBUF_NAMESPACE_ID::Message const * const file_default_instances[] = {
@@ -147,18 +155,20 @@ const char descriptor_table_protodef_blockStorage_2eproto[] PROTOBUF_SECTION_VAR
   "\n\022blockStorage.proto\022\014BlockStorage\"\037\n\rSe"
   "rializeByte\022\016\n\006buffer\030\001 \001(\014\"<\n\nReadResul"
   "t\022\021\n\tbytesread\030\001 \001(\005\022\016\n\006buffer\030\002 \001(\014\022\013\n\003"
-  "err\030\003 \001(\005\"\036\n\013ReadRequest\022\017\n\007address\030\001 \001("
-  "\r\"/\n\014WriteRequest\022\017\n\007address\030\001 \001(\r\022\016\n\006bu"
-  "ffer\030\002 \001(\014\"*\n\013WriteResult\022\016\n\006nbytes\030\001 \001("
-  "\005\022\013\n\003err\030\002 \001(\0052\236\001\n\023BlockStorageService\022A"
-  "\n\010rpc_read\022\031.BlockStorage.ReadRequest\032\030."
-  "BlockStorage.ReadResult\"\000\022D\n\trpc_write\022\032"
-  ".BlockStorage.WriteRequest\032\031.BlockStorag"
-  "e.WriteResult\"\000b\006proto3"
+  "err\030\003 \001(\005\"<\n\013ReadRequest\022\017\n\007address\030\001 \001("
+  "\r\022\014\n\004size\030\002 \001(\r\022\016\n\006offset\030\003 \001(\r\"M\n\014Write"
+  "Request\022\017\n\007address\030\001 \001(\r\022\016\n\006buffer\030\002 \001(\014"
+  "\022\014\n\004size\030\003 \001(\r\022\016\n\006offset\030\004 \001(\r\"*\n\013WriteR"
+  "esult\022\016\n\006nbytes\030\001 \001(\005\022\013\n\003err\030\002 \001(\0052\236\001\n\023B"
+  "lockStorageService\022A\n\010rpc_read\022\031.BlockSt"
+  "orage.ReadRequest\032\030.BlockStorage.ReadRes"
+  "ult\"\000\022D\n\trpc_write\022\032.BlockStorage.WriteR"
+  "equest\032\031.BlockStorage.WriteResult\"\000b\006pro"
+  "to3"
   ;
 static ::PROTOBUF_NAMESPACE_ID::internal::once_flag descriptor_table_blockStorage_2eproto_once;
 const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_blockStorage_2eproto = {
-  false, false, 423, descriptor_table_protodef_blockStorage_2eproto, "blockStorage.proto", 
+  false, false, 483, descriptor_table_protodef_blockStorage_2eproto, "blockStorage.proto", 
   &descriptor_table_blockStorage_2eproto_once, nullptr, 0, 5,
   schemas, file_default_instances, TableStruct_blockStorage_2eproto::offsets,
   file_level_metadata_blockStorage_2eproto, file_level_enum_descriptors_blockStorage_2eproto, file_level_service_descriptors_blockStorage_2eproto,
@@ -633,12 +643,17 @@ ReadRequest::ReadRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
 ReadRequest::ReadRequest(const ReadRequest& from)
   : ::PROTOBUF_NAMESPACE_ID::Message() {
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
-  address_ = from.address_;
+  ::memcpy(&address_, &from.address_,
+    static_cast<size_t>(reinterpret_cast<char*>(&offset_) -
+    reinterpret_cast<char*>(&address_)) + sizeof(offset_));
   // @@protoc_insertion_point(copy_constructor:BlockStorage.ReadRequest)
 }
 
 void ReadRequest::SharedCtor() {
-address_ = 0u;
+::memset(reinterpret_cast<char*>(this) + static_cast<size_t>(
+    reinterpret_cast<char*>(&address_) - reinterpret_cast<char*>(this)),
+    0, static_cast<size_t>(reinterpret_cast<char*>(&offset_) -
+    reinterpret_cast<char*>(&address_)) + sizeof(offset_));
 }
 
 ReadRequest::~ReadRequest() {
@@ -668,7 +683,9 @@ void ReadRequest::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  address_ = 0u;
+  ::memset(&address_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&offset_) -
+      reinterpret_cast<char*>(&address_)) + sizeof(offset_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -682,6 +699,22 @@ const char* ReadRequest::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID
       case 1:
         if (PROTOBUF_PREDICT_TRUE(static_cast<::PROTOBUF_NAMESPACE_ID::uint8>(tag) == 8)) {
           address_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // uint32 size = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<::PROTOBUF_NAMESPACE_ID::uint8>(tag) == 16)) {
+          size_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // uint32 offset = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<::PROTOBUF_NAMESPACE_ID::uint8>(tag) == 24)) {
+          offset_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
@@ -721,6 +754,18 @@ failure:
     target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteUInt32ToArray(1, this->_internal_address(), target);
   }
 
+  // uint32 size = 2;
+  if (this->_internal_size() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteUInt32ToArray(2, this->_internal_size(), target);
+  }
+
+  // uint32 offset = 3;
+  if (this->_internal_offset() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteUInt32ToArray(3, this->_internal_offset(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -740,6 +785,16 @@ size_t ReadRequest::ByteSizeLong() const {
   // uint32 address = 1;
   if (this->_internal_address() != 0) {
     total_size += ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::UInt32SizePlusOne(this->_internal_address());
+  }
+
+  // uint32 size = 2;
+  if (this->_internal_size() != 0) {
+    total_size += ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::UInt32SizePlusOne(this->_internal_size());
+  }
+
+  // uint32 offset = 3;
+  if (this->_internal_offset() != 0) {
+    total_size += ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::UInt32SizePlusOne(this->_internal_offset());
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_cached_size_);
@@ -767,6 +822,12 @@ void ReadRequest::MergeFrom(const ReadRequest& from) {
   if (from._internal_address() != 0) {
     _internal_set_address(from._internal_address());
   }
+  if (from._internal_size() != 0) {
+    _internal_set_size(from._internal_size());
+  }
+  if (from._internal_offset() != 0) {
+    _internal_set_offset(from._internal_offset());
+  }
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -784,7 +845,12 @@ bool ReadRequest::IsInitialized() const {
 void ReadRequest::InternalSwap(ReadRequest* other) {
   using std::swap;
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(address_, other->address_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(ReadRequest, offset_)
+      + sizeof(ReadRequest::offset_)
+      - PROTOBUF_FIELD_OFFSET(ReadRequest, address_)>(
+          reinterpret_cast<char*>(&address_),
+          reinterpret_cast<char*>(&other->address_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata ReadRequest::GetMetadata() const {
@@ -816,13 +882,18 @@ WriteRequest::WriteRequest(const WriteRequest& from)
     buffer_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, from._internal_buffer(), 
       GetArenaForAllocation());
   }
-  address_ = from.address_;
+  ::memcpy(&address_, &from.address_,
+    static_cast<size_t>(reinterpret_cast<char*>(&offset_) -
+    reinterpret_cast<char*>(&address_)) + sizeof(offset_));
   // @@protoc_insertion_point(copy_constructor:BlockStorage.WriteRequest)
 }
 
 void WriteRequest::SharedCtor() {
 buffer_.UnsafeSetDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
-address_ = 0u;
+::memset(reinterpret_cast<char*>(this) + static_cast<size_t>(
+    reinterpret_cast<char*>(&address_) - reinterpret_cast<char*>(this)),
+    0, static_cast<size_t>(reinterpret_cast<char*>(&offset_) -
+    reinterpret_cast<char*>(&address_)) + sizeof(offset_));
 }
 
 WriteRequest::~WriteRequest() {
@@ -854,7 +925,9 @@ void WriteRequest::Clear() {
   (void) cached_has_bits;
 
   buffer_.ClearToEmpty();
-  address_ = 0u;
+  ::memset(&address_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&offset_) -
+      reinterpret_cast<char*>(&address_)) + sizeof(offset_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -877,6 +950,22 @@ const char* WriteRequest::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_I
         if (PROTOBUF_PREDICT_TRUE(static_cast<::PROTOBUF_NAMESPACE_ID::uint8>(tag) == 18)) {
           auto str = _internal_mutable_buffer();
           ptr = ::PROTOBUF_NAMESPACE_ID::internal::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // uint32 size = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<::PROTOBUF_NAMESPACE_ID::uint8>(tag) == 24)) {
+          size_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // uint32 offset = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<::PROTOBUF_NAMESPACE_ID::uint8>(tag) == 32)) {
+          offset_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
@@ -922,6 +1011,18 @@ failure:
         2, this->_internal_buffer(), target);
   }
 
+  // uint32 size = 3;
+  if (this->_internal_size() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteUInt32ToArray(3, this->_internal_size(), target);
+  }
+
+  // uint32 offset = 4;
+  if (this->_internal_offset() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteUInt32ToArray(4, this->_internal_offset(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -948,6 +1049,16 @@ size_t WriteRequest::ByteSizeLong() const {
   // uint32 address = 1;
   if (this->_internal_address() != 0) {
     total_size += ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::UInt32SizePlusOne(this->_internal_address());
+  }
+
+  // uint32 size = 3;
+  if (this->_internal_size() != 0) {
+    total_size += ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::UInt32SizePlusOne(this->_internal_size());
+  }
+
+  // uint32 offset = 4;
+  if (this->_internal_offset() != 0) {
+    total_size += ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::UInt32SizePlusOne(this->_internal_offset());
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_cached_size_);
@@ -978,6 +1089,12 @@ void WriteRequest::MergeFrom(const WriteRequest& from) {
   if (from._internal_address() != 0) {
     _internal_set_address(from._internal_address());
   }
+  if (from._internal_size() != 0) {
+    _internal_set_size(from._internal_size());
+  }
+  if (from._internal_offset() != 0) {
+    _internal_set_offset(from._internal_offset());
+  }
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -1002,7 +1119,12 @@ void WriteRequest::InternalSwap(WriteRequest* other) {
       &buffer_, lhs_arena,
       &other->buffer_, rhs_arena
   );
-  swap(address_, other->address_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(WriteRequest, offset_)
+      + sizeof(WriteRequest::offset_)
+      - PROTOBUF_FIELD_OFFSET(WriteRequest, address_)>(
+          reinterpret_cast<char*>(&address_),
+          reinterpret_cast<char*>(&other->address_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata WriteRequest::GetMetadata() const {

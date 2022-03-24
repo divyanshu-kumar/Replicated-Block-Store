@@ -519,6 +519,8 @@ class ReadRequest final :
 
   enum : int {
     kAddressFieldNumber = 1,
+    kSizeFieldNumber = 2,
+    kOffsetFieldNumber = 3,
   };
   // uint32 address = 1;
   void clear_address();
@@ -529,6 +531,24 @@ class ReadRequest final :
   void _internal_set_address(::PROTOBUF_NAMESPACE_ID::uint32 value);
   public:
 
+  // uint32 size = 2;
+  void clear_size();
+  ::PROTOBUF_NAMESPACE_ID::uint32 size() const;
+  void set_size(::PROTOBUF_NAMESPACE_ID::uint32 value);
+  private:
+  ::PROTOBUF_NAMESPACE_ID::uint32 _internal_size() const;
+  void _internal_set_size(::PROTOBUF_NAMESPACE_ID::uint32 value);
+  public:
+
+  // uint32 offset = 3;
+  void clear_offset();
+  ::PROTOBUF_NAMESPACE_ID::uint32 offset() const;
+  void set_offset(::PROTOBUF_NAMESPACE_ID::uint32 value);
+  private:
+  ::PROTOBUF_NAMESPACE_ID::uint32 _internal_offset() const;
+  void _internal_set_offset(::PROTOBUF_NAMESPACE_ID::uint32 value);
+  public:
+
   // @@protoc_insertion_point(class_scope:BlockStorage.ReadRequest)
  private:
   class _Internal;
@@ -537,6 +557,8 @@ class ReadRequest final :
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
   ::PROTOBUF_NAMESPACE_ID::uint32 address_;
+  ::PROTOBUF_NAMESPACE_ID::uint32 size_;
+  ::PROTOBUF_NAMESPACE_ID::uint32 offset_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_blockStorage_2eproto;
 };
@@ -663,6 +685,8 @@ class WriteRequest final :
   enum : int {
     kBufferFieldNumber = 2,
     kAddressFieldNumber = 1,
+    kSizeFieldNumber = 3,
+    kOffsetFieldNumber = 4,
   };
   // bytes buffer = 2;
   void clear_buffer();
@@ -687,6 +711,24 @@ class WriteRequest final :
   void _internal_set_address(::PROTOBUF_NAMESPACE_ID::uint32 value);
   public:
 
+  // uint32 size = 3;
+  void clear_size();
+  ::PROTOBUF_NAMESPACE_ID::uint32 size() const;
+  void set_size(::PROTOBUF_NAMESPACE_ID::uint32 value);
+  private:
+  ::PROTOBUF_NAMESPACE_ID::uint32 _internal_size() const;
+  void _internal_set_size(::PROTOBUF_NAMESPACE_ID::uint32 value);
+  public:
+
+  // uint32 offset = 4;
+  void clear_offset();
+  ::PROTOBUF_NAMESPACE_ID::uint32 offset() const;
+  void set_offset(::PROTOBUF_NAMESPACE_ID::uint32 value);
+  private:
+  ::PROTOBUF_NAMESPACE_ID::uint32 _internal_offset() const;
+  void _internal_set_offset(::PROTOBUF_NAMESPACE_ID::uint32 value);
+  public:
+
   // @@protoc_insertion_point(class_scope:BlockStorage.WriteRequest)
  private:
   class _Internal;
@@ -696,6 +738,8 @@ class WriteRequest final :
   typedef void DestructorSkippable_;
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr buffer_;
   ::PROTOBUF_NAMESPACE_ID::uint32 address_;
+  ::PROTOBUF_NAMESPACE_ID::uint32 size_;
+  ::PROTOBUF_NAMESPACE_ID::uint32 offset_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_blockStorage_2eproto;
 };
@@ -1024,6 +1068,46 @@ inline void ReadRequest::set_address(::PROTOBUF_NAMESPACE_ID::uint32 value) {
   // @@protoc_insertion_point(field_set:BlockStorage.ReadRequest.address)
 }
 
+// uint32 size = 2;
+inline void ReadRequest::clear_size() {
+  size_ = 0u;
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint32 ReadRequest::_internal_size() const {
+  return size_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint32 ReadRequest::size() const {
+  // @@protoc_insertion_point(field_get:BlockStorage.ReadRequest.size)
+  return _internal_size();
+}
+inline void ReadRequest::_internal_set_size(::PROTOBUF_NAMESPACE_ID::uint32 value) {
+  
+  size_ = value;
+}
+inline void ReadRequest::set_size(::PROTOBUF_NAMESPACE_ID::uint32 value) {
+  _internal_set_size(value);
+  // @@protoc_insertion_point(field_set:BlockStorage.ReadRequest.size)
+}
+
+// uint32 offset = 3;
+inline void ReadRequest::clear_offset() {
+  offset_ = 0u;
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint32 ReadRequest::_internal_offset() const {
+  return offset_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint32 ReadRequest::offset() const {
+  // @@protoc_insertion_point(field_get:BlockStorage.ReadRequest.offset)
+  return _internal_offset();
+}
+inline void ReadRequest::_internal_set_offset(::PROTOBUF_NAMESPACE_ID::uint32 value) {
+  
+  offset_ = value;
+}
+inline void ReadRequest::set_offset(::PROTOBUF_NAMESPACE_ID::uint32 value) {
+  _internal_set_offset(value);
+  // @@protoc_insertion_point(field_set:BlockStorage.ReadRequest.offset)
+}
+
 // -------------------------------------------------------------------
 
 // WriteRequest
@@ -1092,6 +1176,46 @@ inline void WriteRequest::set_allocated_buffer(std::string* buffer) {
   buffer_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), buffer,
       GetArenaForAllocation());
   // @@protoc_insertion_point(field_set_allocated:BlockStorage.WriteRequest.buffer)
+}
+
+// uint32 size = 3;
+inline void WriteRequest::clear_size() {
+  size_ = 0u;
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint32 WriteRequest::_internal_size() const {
+  return size_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint32 WriteRequest::size() const {
+  // @@protoc_insertion_point(field_get:BlockStorage.WriteRequest.size)
+  return _internal_size();
+}
+inline void WriteRequest::_internal_set_size(::PROTOBUF_NAMESPACE_ID::uint32 value) {
+  
+  size_ = value;
+}
+inline void WriteRequest::set_size(::PROTOBUF_NAMESPACE_ID::uint32 value) {
+  _internal_set_size(value);
+  // @@protoc_insertion_point(field_set:BlockStorage.WriteRequest.size)
+}
+
+// uint32 offset = 4;
+inline void WriteRequest::clear_offset() {
+  offset_ = 0u;
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint32 WriteRequest::_internal_offset() const {
+  return offset_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::uint32 WriteRequest::offset() const {
+  // @@protoc_insertion_point(field_get:BlockStorage.WriteRequest.offset)
+  return _internal_offset();
+}
+inline void WriteRequest::_internal_set_offset(::PROTOBUF_NAMESPACE_ID::uint32 value) {
+  
+  offset_ = value;
+}
+inline void WriteRequest::set_offset(::PROTOBUF_NAMESPACE_ID::uint32 value) {
+  _internal_set_offset(value);
+  // @@protoc_insertion_point(field_set:BlockStorage.WriteRequest.offset)
 }
 
 // -------------------------------------------------------------------

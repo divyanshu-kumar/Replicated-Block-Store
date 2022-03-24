@@ -19,7 +19,7 @@ using namespace BlockStorage;
 
 using namespace std;
 
-#define MAX_NUM_RETRIES (1)
+#define MAX_NUM_RETRIES (5)
 #define INITIAL_BACKOFF_MS (50)
 #define MULTIPLIER (1.5)
 
@@ -28,7 +28,9 @@ class BlockStorageClient {
     BlockStorageClient(std::shared_ptr<Channel> channel)
         : stub_(BlockStorageService::NewStub(channel)) {}
 
-    int rpc_read(off_t address) {
+    int rpc_read(uint32_t address, string & buf) {
+        // printf("%s : Address = %d\n", __func__, address);
+
         ReadResult rres;
 
         bool isDone = false;
@@ -38,7 +40,8 @@ class BlockStorageClient {
             ClientContext clientContext;
             ReadRequest rr;
             rr.set_address(address);
-
+            rr.set_offset(0);
+            rr.set_size(4096);
             // Set timeout for API
             std::chrono::system_clock::time_point deadline =
                 std::chrono::system_clock::now() +
@@ -61,17 +64,17 @@ class BlockStorageClient {
             printf("%s \t : Timed out to contact server.\n", __func__);
         }
         
-        char buf[4096];
-
         if (rres.err() == 0) {
-            strcpy(buf, rres.buffer().c_str());
+            buf = rres.buffer();
             return rres.bytesread();
         } else {
             return -rres.err();
         }
     }
 
-    int rpc_write(const char* buf, off_t address) {
+    int rpc_write(uint32_t address, const string & buf) {
+        // printf("%s : Address = %d\n", __func__, address);
+
         WriteResult wres;
 
         bool isDone = false;
@@ -82,6 +85,8 @@ class BlockStorageClient {
             WriteRequest wreq;
             wreq.set_address(address);
             wreq.set_buffer(buf);
+            wreq.set_offset(0);
+            wreq.set_size(4096);
 
             std::chrono::system_clock::time_point deadline =
                 std::chrono::system_clock::now() +
