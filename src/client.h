@@ -1,9 +1,21 @@
+#include <assert.h>
+#include <dirent.h>
+#include <errno.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/time.h>
+#include <time.h>
+#include <unistd.h>
+#include <chrono>
+#include <condition_variable>
+#include <iostream>
+#include <mutex>
+#include <thread>
+#include <numeric>
 #include <grpc++/grpc++.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
-
-#include <chrono>
 #include <vector>
 
 #include "blockStorage.grpc.pb.h"
@@ -14,14 +26,20 @@ using grpc::ClientReader;
 using grpc::ClientReaderWriter;
 using grpc::ClientWriter;
 using grpc::Status;
-
 using namespace BlockStorage;
-
 using namespace std;
 
-#define MAX_NUM_RETRIES (5)
-#define INITIAL_BACKOFF_MS (50)
-#define MULTIPLIER (1.5)
+enum DebugLevel { LevelInfo = 0, LevelError = 1, LevelNone = 2 };
+const DebugLevel debugMode = LevelNone;
+
+const int one_kb = 1024;
+const int one_mb = 1024 * one_kb;
+const int one_gb = 1024 * one_mb;
+const int MAX_SIZE_BYTES = one_gb;
+const int BLOCK_SIZE_BYTES = 4 * one_kb;
+const int MAX_NUM_RETRIES = 5;
+const int INITIAL_BACKOFF_MS = 50;
+const int MULTIPLIER = 1.5;
 
 class BlockStorageClient {
    public:
@@ -119,3 +137,32 @@ class BlockStorageClient {
    private:
     std::unique_ptr<BlockStorageService::Stub> stub_;
 };
+
+inline void get_time(struct timespec *ts) {
+    clock_gettime(CLOCK_MONOTONIC, ts);
+}
+
+inline double get_time_diff(struct timespec *before, struct timespec *after) {
+    double delta_s = after->tv_sec - before->tv_sec;
+    double delta_ns = after->tv_nsec - before->tv_nsec;
+
+    return (delta_s + (delta_ns * 1e-9)) * ((double)1e3);
+}
+
+int msleep(long msec) {
+    struct timespec ts;
+    int res;
+    if (msec < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    ts.tv_sec = msec / 1000;
+    ts.tv_nsec = (msec % 1000) * 1000000;
+
+    do {
+        res = nanosleep(&ts, &ts);
+    } while (res && errno == EINTR);
+
+    return res;
+}

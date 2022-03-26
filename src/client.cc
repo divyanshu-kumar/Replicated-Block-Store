@@ -1,39 +1,6 @@
-#define FUSE_USE_VERSION 30
-
-#include <assert.h>
-#include <dirent.h>
-#include <errno.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/time.h>
-#include <time.h>
-#include <unistd.h>
-
-#include <chrono>
-#include <condition_variable>
-#include <iostream>
-#include <mutex>
-#include <thread>
-#include <numeric>
-
 #include "client.h"
 
-enum DebugLevel { LevelInfo = 0, LevelError = 1, LevelNone = 2 };
-
-const DebugLevel debugMode = LevelNone;
-
-const int one_kb = 1024;
-const int one_mb = 1024 * one_kb;
-const int one_gb = 1024 * one_mb;
-
-const int MAX_SIZE_BYTES = one_gb;
-const int BLOCK_SIZE_BYTES = 4 * one_kb;
-
-inline void get_time(struct timespec *ts);
-inline double get_time_diff(struct timespec *before, struct timespec *after);
 int run_application();
-int msleep(long msec);
 
 static struct options {
     BlockStorageClient *blockStorageClient;
@@ -64,7 +31,6 @@ int main(int argc, char *argv[]) {
     if (debugMode <= DebugLevel::LevelInfo) {
         printf("%s \t: %s\n", __func__, argv[0]);
     }
-
     
     std::string server_address = "localhost:50051";
 
@@ -163,33 +129,3 @@ int run_application() {
             readTimes.front(), writeTimes.front(), readTimes.back(), writeTimes.back());
     return 0;
 }
-
-inline void get_time(struct timespec *ts) {
-    clock_gettime(CLOCK_MONOTONIC, ts);
-}
-
-inline double get_time_diff(struct timespec *before, struct timespec *after) {
-    double delta_s = after->tv_sec - before->tv_sec;
-    double delta_ns = after->tv_nsec - before->tv_nsec;
-
-    return (delta_s + (delta_ns * 1e-9)) * ((double)1e3);
-}
-
-int msleep(long msec) {
-    struct timespec ts;
-    int res;
-    if (msec < 0) {
-        errno = EINVAL;
-        return -1;
-    }
-
-    ts.tv_sec = msec / 1000;
-    ts.tv_nsec = (msec % 1000) * 1000000;
-
-    do {
-        res = nanosleep(&ts, &ts);
-    } while (res && errno == EINTR);
-
-    return res;
-}
-
