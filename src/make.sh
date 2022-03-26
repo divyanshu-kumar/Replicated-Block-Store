@@ -6,3 +6,7 @@ export PKG_CONFIG_PATH=$MY_INSTALL_DIR/lib/pkgconfig
 make
 
 export PATH=$PATH_OLD
+
+mkdir -p BackupServer
+
+cp server BackupServer/

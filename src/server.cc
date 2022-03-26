@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
             role = "";
         }
     }
-
+    
     if (role.empty() || my_address.empty()) {
         printf( "Enter arguments like below and try again - \n"
                 "./server --role=[primary or backup] "
@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-/* 
+/*
 Example server commands:
 For primary, in src folder : ./server --role=primary --my_address=0.0.0.0:50051 --other_address=0.0.0.0:50053
 For backup, in folder BackupServer: ./server --role=backup --my_address=0.0.0.0:50053 --other_address=0.0.0.0:50051

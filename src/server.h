@@ -42,9 +42,10 @@ const int one_mb = 1024 * one_kb;
 const int one_gb = 1024 * one_mb;
 const int MAX_SIZE_BYTES = one_gb;
 const int BLOCK_SIZE_BYTES = 4 * one_kb;
-const int MAX_NUM_RETRIES = 5;
-const int INITIAL_BACKOFF_MS = 50;
+const int MAX_NUM_RETRIES = 3;
+const int INITIAL_BACKOFF_MS = 10;
 const int MULTIPLIER = 1.5;
+const int numBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
 
 string  currentWorkDir,
         dataDirPath,
@@ -54,7 +55,7 @@ static string   role,
                 other_address,
                 my_address;
 
-static vector<std::mutex> blockLock(MAX_SIZE_BYTES / BLOCK_SIZE_BYTES);
+static vector<std::mutex> blockLock(numBlocks);
 
 void    get_time(struct timespec* ts);
 double  get_time_diff(struct timespec* before, struct timespec* after);
@@ -70,6 +71,19 @@ int     localWrite(const WriteRequest* wr);
 string  parseArgument(const string & argumentString, const string & option);
 bool    isRoleValid();
 bool    isIPValid(const string & address);
+int     localRead(const int address, char * buf);
+
+struct BackupOutOfSync {
+    bool isOutOfSync;
+    vector<bool> outOfSyncBlocks;
+    
+    BackupOutOfSync() : isOutOfSync(false),
+        outOfSyncBlocks(numBlocks, false) {}
+
+    void logOutOfSync(const int address);
+
+    int sync();
+} backupSyncState;
 
 class ServerReplication final : public BlockStorageService::Service {
    public:
@@ -84,7 +98,7 @@ class ServerReplication final : public BlockStorageService::Service {
         WriteResult wres;
 
         bool isDone = false;
-        unsigned int numRetriesLeft = MAX_NUM_RETRIES;
+        int numRetriesLeft = MAX_NUM_RETRIES;
         unsigned int currentBackoff = INITIAL_BACKOFF_MS;
         while (!isDone) {
             ClientContext ctx;
@@ -104,10 +118,15 @@ class ServerReplication final : public BlockStorageService::Service {
             Status status = stub_->rpc_write(&ctx, wreq, &wres);
             currentBackoff *= MULTIPLIER;
             if (status.error_code() != grpc::StatusCode::DEADLINE_EXCEEDED || numRetriesLeft-- == 0) {
+                if (numRetriesLeft <= 0) {
+                    printf("%s \t : Server seems offline. Error Code = %d, numRetriesLeft = %d\n", 
+                    __func__, status.error_code(), numRetriesLeft);
+                    return -1;
+                }
                 isDone = true;
             }
             else {
-                printf("%s \t : Timed out to contact server. Retrying...\n", __func__);
+                // printf("%s \t : Timed out to contact server. Retrying...\n", __func__);
             }
         }
 
@@ -177,11 +196,15 @@ class ServerReplication final : public BlockStorageService::Service {
         }
 
         if (bytes_written_local != -1 && role == "primary") {
-            // printf("%s : Primary calling write on Backup!\n", __func__);
-            // intitate write inside backup 
-            int bytes_written_backup = this->rpc_write(wr->address(), wr->buffer());
-            if (bytes_written_local != bytes_written_backup){ // Means backup is Dead?
-                // TODO : enter a log locally for later sync up
+            if (backupSyncState.isOutOfSync) {
+                backupSyncState.logOutOfSync(wr->address());
+                backupSyncState.sync();
+            }
+            else {
+                int bytes_written_backup = this->rpc_write(wr->address(), wr->buffer());
+                if (bytes_written_local != bytes_written_backup){ 
+                    backupSyncState.logOutOfSync(wr->address());
+                }
             }
         }
         
@@ -200,6 +223,47 @@ class ServerReplication final : public BlockStorageService::Service {
 };
 
 static ServerReplication *serverReplication;
+
+void BackupOutOfSync::logOutOfSync(const int address) {
+    isOutOfSync = true;
+    // const int four_kb = 4 * one_kb;
+    outOfSyncBlocks[address] = true;
+    // if (address % four_kb != 0) {
+    //     if ((address / four_kb) + 1 < numBlocks) {
+    //         outOfSyncBlocks[(address / four_kb) + 1] = true;
+    //     }
+    // }
+}
+
+int BackupOutOfSync::sync() {
+    int res = 0;
+    
+    for (int blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
+        if (outOfSyncBlocks[blockIdx] == false) {
+            continue;
+        }
+        const int four_kb = 4 * one_kb;
+        char buf[four_kb + 1];
+        res = localRead(blockIdx, buf);
+        if (res == -1) {
+            return -1;
+        }
+        
+        res = serverReplication->rpc_write(blockIdx, buf);
+        if (res < 0) {
+            // cout <<  __func__ << " Error sending file" << endl;
+            return -1;
+        }
+        
+        outOfSyncBlocks[blockIdx] = false;
+    }
+
+    cout <<  __func__ << __LINE__ << " Successfully sync'd changed files, res =  " << res << endl;
+
+    isOutOfSync = false;
+
+    return 0;
+}
 
 int logWriteTransaction(int address){
     string destPath = writeTxLogsDirPath + "/" + to_string(address);
@@ -457,4 +521,26 @@ inline double get_time_diff(struct timespec* before, struct timespec* after) {
     double delta_ns = after->tv_nsec - before->tv_nsec;
 
     return (delta_s + (delta_ns * 1e-9)) * ((double)1e3);
+}
+
+int localRead(const int address, char * buf) {
+    string blockAddress = dataDirPath + "/" + to_string(address);
+    int fd = open(blockAddress.c_str(), O_RDONLY);
+        
+    if (fd == -1) {
+        printf("%s \n", __func__);
+        perror(strerror(errno));
+        return -1;
+    }
+
+    int res = pread(fd, buf, one_kb * 4, 0);
+    if (res == -1) {
+        printf("%s \n", __func__);
+        perror(strerror(errno));
+        return -1;
+    }
+
+    close(fd);
+    
+    return 0;
 }

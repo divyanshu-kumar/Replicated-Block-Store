@@ -37,9 +37,9 @@ const int one_mb = 1024 * one_kb;
 const int one_gb = 1024 * one_mb;
 const int MAX_SIZE_BYTES = one_gb;
 const int BLOCK_SIZE_BYTES = 4 * one_kb;
-const int MAX_NUM_RETRIES = 5;
+const int MAX_NUM_RETRIES = 10;
 const int INITIAL_BACKOFF_MS = 50;
-const int MULTIPLIER = 1.5;
+const int MULTIPLIER = 2;
 
 class BlockStorageClient {
    public:
@@ -52,7 +52,7 @@ class BlockStorageClient {
         ReadResult rres;
 
         bool isDone = false;
-        unsigned int numRetriesLeft = MAX_NUM_RETRIES;
+        int numRetriesLeft = MAX_NUM_RETRIES;
         unsigned int currentBackoff = INITIAL_BACKOFF_MS;
         while (!isDone) {
             ClientContext clientContext;
@@ -96,7 +96,7 @@ class BlockStorageClient {
         WriteResult wres;
 
         bool isDone = false;
-        unsigned int numRetriesLeft = MAX_NUM_RETRIES;
+        int numRetriesLeft = MAX_NUM_RETRIES;
         unsigned int currentBackoff = INITIAL_BACKOFF_MS;
         while (!isDone) {
             ClientContext ctx;
