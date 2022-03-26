@@ -125,7 +125,7 @@ int run_application() {
             printf("Didn't read 4k bytes from this file!\n");
         }
 
-        address = max(0, rand()) % 262144;
+        address = max(0, rand()) % totalBlocks;
         
         struct timespec write_start, write_end;
         get_time(&write_start);
