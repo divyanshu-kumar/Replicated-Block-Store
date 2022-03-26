@@ -13,9 +13,11 @@
 #include <string>
 #include <signal.h>
 #include <thread>
+#include <mutex>
 #include <grpc++/grpc++.h>
 #include <chrono>
 #include <vector>
+#include <arpa/inet.h>
 
 #include "blockStorage.grpc.pb.h"
 
@@ -51,6 +53,8 @@ string  currentWorkDir,
 static string   role,
                 other_address,
                 my_address;
+
+static vector<std::mutex> blockLock(MAX_SIZE_BYTES / BLOCK_SIZE_BYTES);
 
 void    get_time(struct timespec* ts);
 double  get_time_diff(struct timespec* before, struct timespec* after);
@@ -156,6 +160,7 @@ class ServerReplication final : public BlockStorageService::Service {
     Status rpc_write(ServerContext* context, const WriteRequest* wr,
                          WriteResult* reply) override {
         // printf("%s : Address = %u\n", __func__, wr->address());
+        lock_guard<mutex> guard(blockLock[wr->address()]);
         
         int res  = logWriteTransaction(wr->address());
 
@@ -295,8 +300,6 @@ void makeFolderAndBlocks() {
     for (auto &th : workers) {
         th.join();
     }
-
-    
 }
 
 void makeBlocks(int block_id_start, int block_id_end) {
@@ -432,8 +435,17 @@ bool isRoleValid() {
     return role == "primary" || role == "backup";
 }
 
-bool isIPValid(const string & ip_address) {
-    return true;
+bool isIPValid(const string & address) {
+    size_t ipEndPos = address.find(":");
+    string ipAddress = address.substr(0, ipEndPos);
+    struct sockaddr_in sa;
+    int result = inet_pton(AF_INET, ipAddress.c_str(), &(sa.sin_addr));
+    if (result == 0) {
+        return false;
+    }
+    string portAddress = address.substr(ipEndPos + 1);
+    int port = stoi(portAddress);
+    return (port > 0 && port <= 65535);
 }
 
 inline void get_time(struct timespec* ts) {
