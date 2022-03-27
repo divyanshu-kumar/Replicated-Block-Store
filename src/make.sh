@@ -9,4 +9,4 @@ export PATH=$PATH_OLD
 
 mkdir -p BackupServer
 
-cp server BackupServer/
+cp -f server BackupServer/

@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <vector>
+#include <arpa/inet.h>
 
 #include "blockStorage.grpc.pb.h"
 
@@ -37,9 +38,12 @@ const int one_mb = 1024 * one_kb;
 const int one_gb = 1024 * one_mb;
 const int MAX_SIZE_BYTES = one_gb;
 const int BLOCK_SIZE_BYTES = 4 * one_kb;
-const int MAX_NUM_RETRIES = 10;
+const int MAX_NUM_RETRIES = 6;
 const int INITIAL_BACKOFF_MS = 50;
 const int MULTIPLIER = 2;
+
+int SERVER_OFFLINE_ERROR_CODE = -1011317;
+
 
 class BlockStorageClient {
    public:
@@ -54,6 +58,7 @@ class BlockStorageClient {
         bool isDone = false;
         int numRetriesLeft = MAX_NUM_RETRIES;
         unsigned int currentBackoff = INITIAL_BACKOFF_MS;
+        int error_code = 0;
         while (!isDone) {
             ClientContext clientContext;
             ReadRequest rr;
@@ -69,6 +74,7 @@ class BlockStorageClient {
             clientContext.set_deadline(deadline);
 
             Status status = stub_->rpc_read(&clientContext, rr, &rres);
+            error_code = status.error_code();
             currentBackoff *= MULTIPLIER;
             if (status.error_code() != grpc::StatusCode::DEADLINE_EXCEEDED || numRetriesLeft-- == 0) {
                 isDone = true;
@@ -80,6 +86,10 @@ class BlockStorageClient {
 
         if (isDone == false) {
             printf("%s \t : Timed out to contact server.\n", __func__);
+        }
+        // case where server is not responding/offline
+        if(error_code == grpc::StatusCode::DEADLINE_EXCEEDED){
+            return SERVER_OFFLINE_ERROR_CODE;
         }
         
         if (rres.err() == 0) {
@@ -98,6 +108,7 @@ class BlockStorageClient {
         bool isDone = false;
         int numRetriesLeft = MAX_NUM_RETRIES;
         unsigned int currentBackoff = INITIAL_BACKOFF_MS;
+        int error_code = 0;
         while (!isDone) {
             ClientContext ctx;
             WriteRequest wreq;
@@ -112,8 +123,9 @@ class BlockStorageClient {
 
             ctx.set_wait_for_ready(true);
             ctx.set_deadline(deadline);
-            
+
             Status status = stub_->rpc_write(&ctx, wreq, &wres);
+            error_code = status.error_code();
             currentBackoff *= MULTIPLIER;
             if (status.error_code() != grpc::StatusCode::DEADLINE_EXCEEDED || numRetriesLeft-- == 0) {
                 isDone = true;
@@ -122,9 +134,12 @@ class BlockStorageClient {
                 printf("%s \t : Timed out to contact server. Retrying...\n", __func__);
             }
         }
-
+        
         if (isDone == false) {
             printf("%s \t : Timed out to contact server.\n", __func__);
+        }
+        if(error_code == grpc::StatusCode::DEADLINE_EXCEEDED){
+            return SERVER_OFFLINE_ERROR_CODE;
         }
         
         if (wres.err() == 0) {
@@ -138,9 +153,26 @@ class BlockStorageClient {
     std::unique_ptr<BlockStorageService::Stub> stub_;
 };
 
+
+struct ServerInfo{
+    string address;
+    BlockStorageClient* connection;
+
+    void init(string address){
+        this->address = address;
+        cout << "Initialize connection from client to " << address << endl;
+        this->connection =  new BlockStorageClient(grpc::CreateChannel(
+                            address.c_str(), grpc::InsecureChannelCredentials()));
+    }
+};
+static vector<ServerInfo> serverInfos;
+static int currentServerIdx = 0;
+
+
 inline void get_time(struct timespec *ts) {
     clock_gettime(CLOCK_MONOTONIC, ts);
 }
+
 
 inline double get_time_diff(struct timespec *before, struct timespec *after) {
     double delta_s = after->tv_sec - before->tv_sec;
@@ -165,4 +197,38 @@ int msleep(long msec) {
     } while (res && errno == EINTR);
 
     return res;
+}
+
+string parseArgument(const string & argumentString, const string & option) {
+    string value;
+
+    size_t pos = argumentString.find(option);
+    if (pos != string::npos) {
+        pos += option.length();
+        size_t endPos = argumentString.find(' ', pos);
+        value = argumentString.substr(pos, endPos - pos);
+    }
+
+    return value;
+}
+
+bool isIPValid(const string & address) {
+    size_t ipEndPos = address.find(":");
+    string ipAddress = address.substr(0, ipEndPos);
+    struct sockaddr_in sa;
+    int result = (ipAddress == "localhost") ? 1 : inet_pton(AF_INET, ipAddress.c_str(), &(sa.sin_addr));
+    if (result == 0) {
+        return false;
+    }
+    string portAddress = address.substr(ipEndPos + 1);
+    int port = stoi(portAddress);
+    return (port > 0 && port <= 65535);
+}
+
+void initServerInfo(vector<string> addresses){
+    for(string address : addresses){
+        ServerInfo serverInfo;
+        serverInfo.init(address);
+        serverInfos.push_back(serverInfo);
+    }
 }

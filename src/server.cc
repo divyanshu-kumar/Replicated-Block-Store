@@ -46,15 +46,9 @@ int main(int argc, char** argv) {
 
     cout << "Role = " << role << "\nMy Address = " << my_address << 
             "\nOther Address = " << other_address << endl;
-    
-    if (role == "primary") {
-        serverReplication = 
-            new ServerReplication(grpc::CreateChannel(other_address.c_str(), 
-                grpc::InsecureChannelCredentials()));
-    }
-    else {
-        serverReplication = new ServerReplication();
-    }
+
+    serverReplication = new ServerReplication(grpc::CreateChannel(other_address.c_str(),
+                                                grpc::InsecureChannelCredentials()));
 
     makeFolderAndBlocks();
 

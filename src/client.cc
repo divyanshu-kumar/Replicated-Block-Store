@@ -2,27 +2,36 @@
 
 int run_application();
 
-static struct options {
-    BlockStorageClient *blockStorageClient;
-    int show_help;
-} options;
-
-#define OPTION(t, p) \
-    { t, offsetof(struct options, p), 1 }
-
-static void show_help(const char *progname) {
-    printf("%s \n", __func__);
-    std::cout
-        << "usage: " << progname
-        << " [-s -d] <mountpoint> [--server=ip:port, Default = localhost]\n\n";
+int switchServerConnection() {
+    currentServerIdx = (currentServerIdx+1)%serverInfos.size();
+    printf("%s \t: Changing to server at %s...\n", __func__,
+           serverInfos[currentServerIdx].address.c_str());
 }
 
 static int client_read(uint32_t address, string & buf) {
-    return options.blockStorageClient->rpc_read(address, buf);
+    int res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf);
+    if(res == SERVER_OFFLINE_ERROR_CODE) {
+        switchServerConnection();
+        res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf);
+        if(res < 0){
+            cout <<"Both servers are offline!" << endl;
+            return -1;
+        }
+    }
+    return res;
 }
 
 static int client_write(uint32_t address, const string & buf) {
-    return options.blockStorageClient->rpc_write(address, buf);
+    int res = (serverInfos[currentServerIdx].connection)->rpc_write(address, buf);
+    if(res == SERVER_OFFLINE_ERROR_CODE) {
+        switchServerConnection();
+        int res = (serverInfos[currentServerIdx].connection)->rpc_write(address, buf);
+        if(res < 0){
+            cout <<"Both servers are offline!" << endl;
+            return -1;
+        }
+    }
+    return res;
 }
 
 int main(int argc, char *argv[]) {
@@ -31,42 +40,49 @@ int main(int argc, char *argv[]) {
     if (debugMode <= DebugLevel::LevelInfo) {
         printf("%s \t: %s\n", __func__, argv[0]);
     }
-    
-    std::string server_address = "localhost:50051";
+
+    vector<string> addresses;
 
     bool isServerArgPassed = false;
     bool isCrashSiteArgPassed = false;
     int crashSite = 0;
-    if (argc > 2) {
-        size_t pos = std::string(argv[argc - 2]).rfind("--server=", 0);
-        if (pos == 0) {
-            isServerArgPassed = true;
-            server_address = std::string(argv[argc - 2]).substr(string("--server=").length());
+    string argumentString;
+
+    if (argc > 1) {
+        for (int arg = 1; arg < argc; arg++) {
+            argumentString.append(argv[arg]);
+            argumentString.push_back(' ');
         }
 
-        pos = std::string(argv[argc - 1]).rfind("--crash=", 0);
-        if (pos == 0) {
-            isCrashSiteArgPassed = true;
-            crashSite = stoi(std::string(argv[argc - 1]).substr(string("--crash=").length()));
-        }        
-    } 
-    else if (argc > 1) {
-        size_t pos = std::string(argv[argc - 1]).rfind("--server=", 0);
-        if (pos == 0) {
-            isServerArgPassed = true;
-            server_address = std::string(argv[argc - 1])
-                                 .substr(string("--server=").length());
-        }
+        string address;
+
+        do {
+            string addressArg = "--address" + to_string(addresses.size() + 1) + "=";
+            address = parseArgument(argumentString, addressArg);
+            if (!address.empty() && !isIPValid(address)) {
+                cout << "Enter a valid IP address and try again!"
+                     << " Invalid IP = " << address << endl;
+                return 0;
+            }
+            if (!address.empty()) {
+                addresses.push_back(address);
+            }
+        } while (!address.empty());
     }
 
-    printf("%s \t: Connecting to server at %s...\n", __func__,
-           server_address.c_str());
+    if (addresses.empty()) {
+        addresses = {"localhost:50051", "localhost:50053"};
+    }
 
-    options.blockStorageClient = new BlockStorageClient(grpc::CreateChannel(
-        server_address.c_str(), grpc::InsecureChannelCredentials()));
+    initServerInfo(addresses);
+
+    printf("%s \t: Connecting to server at %s...\n", __func__,
+           serverInfos[currentServerIdx].address.c_str());
 
     return run_application();
 }
+
+
 
 int run_application() {
     vector<double> readTimes, writeTimes;
