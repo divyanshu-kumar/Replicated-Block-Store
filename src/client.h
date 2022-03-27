@@ -41,9 +41,39 @@ const int BLOCK_SIZE_BYTES = 4 * one_kb;
 const int MAX_NUM_RETRIES = 6;
 const int INITIAL_BACKOFF_MS = 50;
 const int MULTIPLIER = 2;
+const int numBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
+const int isCachingEnabled = true;
+const int stalenessLimit = 60 * 1e3; // milli-seconds
 
 int SERVER_OFFLINE_ERROR_CODE = -1011317;
 
+
+inline void get_time(struct timespec *ts) {
+    clock_gettime(CLOCK_MONOTONIC, ts);
+}
+
+inline double get_time_diff(struct timespec *before, struct timespec *after) {
+    double delta_s = after->tv_sec - before->tv_sec;
+    double delta_ns = after->tv_nsec - before->tv_nsec;
+
+    return (delta_s + (delta_ns * 1e-9)) * ((double)1e3);
+}
+
+struct CacheInfo {
+    bool isCached;
+    string data;
+    struct timespec lastRefreshTs;
+    CacheInfo() : isCached(false) {
+        get_time(&lastRefreshTs);
+    }
+    bool isStale();
+    void cacheData(const string & data);
+    void invalidateCache() {
+        isCached = false;
+    }
+};
+
+vector<CacheInfo> cacheMap(numBlocks);
 
 class BlockStorageClient {
    public:
@@ -84,11 +114,8 @@ class BlockStorageClient {
             }
         }
 
-        if (isDone == false) {
-            printf("%s \t : Timed out to contact server.\n", __func__);
-        }
         // case where server is not responding/offline
-        if(error_code == grpc::StatusCode::DEADLINE_EXCEEDED){
+        if (error_code == grpc::StatusCode::DEADLINE_EXCEEDED){
             return SERVER_OFFLINE_ERROR_CODE;
         }
         
@@ -135,10 +162,7 @@ class BlockStorageClient {
             }
         }
         
-        if (isDone == false) {
-            printf("%s \t : Timed out to contact server.\n", __func__);
-        }
-        if(error_code == grpc::StatusCode::DEADLINE_EXCEEDED){
+        if (error_code == grpc::StatusCode::DEADLINE_EXCEEDED){
             return SERVER_OFFLINE_ERROR_CODE;
         }
         
@@ -167,19 +191,6 @@ struct ServerInfo{
 };
 static vector<ServerInfo> serverInfos;
 static int currentServerIdx = 0;
-
-
-inline void get_time(struct timespec *ts) {
-    clock_gettime(CLOCK_MONOTONIC, ts);
-}
-
-
-inline double get_time_diff(struct timespec *before, struct timespec *after) {
-    double delta_s = after->tv_sec - before->tv_sec;
-    double delta_ns = after->tv_nsec - before->tv_nsec;
-
-    return (delta_s + (delta_ns * 1e-9)) * ((double)1e3);
-}
 
 int msleep(long msec) {
     struct timespec ts;
@@ -231,4 +242,19 @@ void initServerInfo(vector<string> addresses){
         serverInfo.init(address);
         serverInfos.push_back(serverInfo);
     }
+}
+
+bool CacheInfo::isStale() {
+    struct timespec curTime;
+    get_time(&curTime);
+    double timeDiff = get_time_diff(&lastRefreshTs, &curTime);
+    isCached = isCached && (timeDiff < stalenessLimit);
+    // cout << __func__ << " Time Diff = " << timeDiff << endl;
+    return !isCached;
+}
+
+void CacheInfo::cacheData(const string & data) {
+    this->data = data;
+    isCached = true;
+    get_time(&lastRefreshTs);
 }

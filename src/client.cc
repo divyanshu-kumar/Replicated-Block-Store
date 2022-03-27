@@ -9,8 +9,20 @@ int switchServerConnection() {
 }
 
 static int client_read(uint32_t address, string & buf) {
-    int res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf);
-    if(res == SERVER_OFFLINE_ERROR_CODE) {
+    int res = 0;
+
+    if (isCachingEnabled) {
+        if (cacheMap[address].isCached && !cacheMap[address].isStale()) {
+            cout << __func__ << "Cached data found for file " << address << endl;
+            buf = cacheMap[address].data;
+            return res = buf.size();
+        }
+        else {
+            // cout << __func__ << "Cached data not found for file " << address << endl;
+        }
+    }
+    res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf);
+    if (res == SERVER_OFFLINE_ERROR_CODE) {
         switchServerConnection();
         res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf);
         if(res < 0){
@@ -18,10 +30,18 @@ static int client_read(uint32_t address, string & buf) {
             return -1;
         }
     }
+    if (isCachingEnabled) {
+        // cout << __func__ << "Cached data successfully for file " << address << endl;
+        cacheMap[address].cacheData(buf);
+    }
     return res;
 }
 
 static int client_write(uint32_t address, const string & buf) {
+    if (isCachingEnabled) {
+        // cout << __func__ << " : Invalidating cache for file " << address << endl;
+        cacheMap[address].invalidateCache();
+    }
     int res = (serverInfos[currentServerIdx].connection)->rpc_write(address, buf);
     if(res == SERVER_OFFLINE_ERROR_CODE) {
         switchServerConnection();
@@ -91,9 +111,9 @@ int run_application() {
 
     int totalBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
 
-    for (int i = 0; i < 500; i++) {
+    for (int i = 0; i < 10; i++) {
         string buf;
-        uint32_t address = max(0, rand()) % totalBlocks;
+        uint32_t address = i % 5;//max(0, rand()) % totalBlocks;
         
         struct timespec read_start, read_end;
         get_time(&read_start);
@@ -104,10 +124,10 @@ int run_application() {
         readTimes.push_back(get_time_diff(&read_start, &read_end));
         
         if (num_bytes_read != 4096) {
-            printf("Didn't read 4k bytes from this file!\n");
+            printf("Didn't read 4k bytes from this file! Instead read %d bytes!\n", num_bytes_read);
         }
 
-        address = max(0, rand()) % totalBlocks;
+        address = i % 5;//max(0, rand()) % totalBlocks;
         
         struct timespec write_start, write_end;
         get_time(&write_start);

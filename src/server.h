@@ -129,10 +129,6 @@ class ServerReplication final : public BlockStorageService::Service {
                 // printf("%s \t : Timed out to contact server. Retrying...\n", __func__);
             }
         }
-
-        if (isDone == false) {
-            printf("%s \t : Timed out to contact server.\n", __func__);
-        }
         
         if (wres.err() == 0) {
             return wres.nbytes();
