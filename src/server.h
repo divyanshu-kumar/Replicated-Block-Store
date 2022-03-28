@@ -119,13 +119,15 @@ struct NotificationInfo {
         return subscriberShouldRun[clientId];
     }
 
-    void Notify(int address){
+    void Notify(int address, const string & writerClientId){
         auto clientIds = subscribedClients[address];
         if (clientIds.empty()) {
             return;
         }
         for (auto clientId : clientIds) {
-            NotifySingleClient(clientId, address);
+            if (writerClientId != clientId) {
+                NotifySingleClient(clientId, address);
+            }
             UnSubscribe(address, clientId);
         }
     }
@@ -250,7 +252,7 @@ class ServerReplication final : public BlockStorageService::Service {
         lock_guard<mutex> guard(blockLock[wr->address()]);
         
         if (role == "primary") {
-            notificationManager.Notify(wr->address());
+            notificationManager.Notify(wr->address(), wr->identifier());
         }
 
         int res  = logWriteTransaction(wr->address());

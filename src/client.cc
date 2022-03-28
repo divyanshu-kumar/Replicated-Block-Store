@@ -114,13 +114,13 @@ int main(int argc, char *argv[]) {
 
 
 int run_application() {
-    vector<double> readTimes, writeTimes;
+    vector<pair<double, int>> readTimes, writeTimes;
 
     string write_data = string(4096, 'x');
 
     int totalBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 100; i++) {
         string buf;
         uint32_t address = i % 5;//max(0, rand()) % totalBlocks;
         
@@ -130,7 +130,7 @@ int run_application() {
         int num_bytes_read = client_read(address, buf);
         
         get_time(&read_end);
-        readTimes.push_back(get_time_diff(&read_start, &read_end));
+        readTimes.push_back(make_pair(get_time_diff(&read_start, &read_end), address));
         
         if (num_bytes_read != 4096) {
             printf("Didn't read 4k bytes from this file! Instead read %d bytes!\n", num_bytes_read);
@@ -142,11 +142,13 @@ int run_application() {
         num_bytes_read = client_read(address, buf);
         
         get_time(&read_end);
-        readTimes.push_back(get_time_diff(&read_start, &read_end));
+        readTimes.push_back(make_pair(get_time_diff(&read_start, &read_end), address));
         
         if (num_bytes_read != 4096) {
             printf("Didn't read 4k bytes from this file! Instead read %d bytes!\n", num_bytes_read);
         }
+
+        msleep(100 * max(0, rand() % 5));
 
         address = i % 5;//max(0, rand()) % totalBlocks;
         
@@ -156,7 +158,7 @@ int run_application() {
         int num_bytes_write = client_write(address, write_data);
         
         get_time(&write_end);
-        writeTimes.push_back(get_time_diff(&write_start, &write_end));
+        writeTimes.push_back(make_pair(get_time_diff(&write_start, &write_end), address));
         
         if (num_bytes_write != 4096) {
             printf("Didn't write 4k bytes to this file!\n");
@@ -165,25 +167,37 @@ int run_application() {
         msleep(max(0, rand() % 10));
     }
 
-    double meanReadTime = std::accumulate(readTimes.begin(), readTimes.end(), 0.0) 
-        / static_cast<double>(readTimes.size());
+    double meanReadTime = 0;
+    for (auto & readTime : readTimes) {
+        meanReadTime += readTime.first;
+    }
+    meanReadTime /= readTimes.size();
 
-    double meanWriteTime = std::accumulate(writeTimes.begin(), writeTimes.end(), 0.0) 
-        / static_cast<double>(writeTimes.size());
+    double meanWriteTime = 0;
+    for (auto & writeTime : writeTimes) {
+        meanWriteTime += writeTime.first;
+    }
+    meanWriteTime /= writeTimes.size();
     
     sort(readTimes.begin(), readTimes.end());
     sort(writeTimes.begin(), writeTimes.end());
     
-    double medianReadTime = readTimes[readTimes.size() / 2];
-    double medianWriteTime = writeTimes[writeTimes.size() / 2];
+    double medianReadTime = readTimes[readTimes.size() / 2].first;
+    double medianWriteTime = writeTimes[writeTimes.size() / 2].first;
 
     printf("%s : *****STATS (milliseconds) *****\n"
             "meanRead   = %f \t meanWrite   = %f \n"
             "medianRead = %f \t medianWrite = %f\n"
             "minRead    = %f \t minWrite    = %f\n"
-            "maxRead    = %f \t maxWrite    = %f\n",
-            __func__, meanReadTime, meanWriteTime, medianReadTime, medianWriteTime,
-            readTimes.front(), writeTimes.front(), readTimes.back(), writeTimes.back());
+            "minAddress = %d \t minAddress  = %d\n"
+            "maxRead    = %f \t maxWrite    = %f\n"
+            "maxAddress = %d \t maxAddress  = %d\n",
+            __func__, meanReadTime, meanWriteTime,
+            medianReadTime, medianWriteTime,
+            readTimes.front().first, writeTimes.front().first,
+            readTimes.front().second, writeTimes.front().second,
+            readTimes.back().first, writeTimes.back().first,
+            readTimes.back().second, writeTimes.back().second);
 
     (serverInfos[currentServerIdx].connection)->rpc_unSubscribeForNotifications();
     notificationThread.join();

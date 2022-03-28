@@ -116,6 +116,7 @@ class BlockStorageClient {
             }
             else {
                 printf("%s \t : Timed out to contact server. Retrying...\n", __func__);
+                cout << __func__ << " : Error code = " << status.error_message() << endl;
             }
         }
 
@@ -165,6 +166,7 @@ class BlockStorageClient {
             }
             else {
                 printf("%s \t : Timed out to contact server. Retrying...\n", __func__);
+                cout << __func__ << " : Error code = " << status.error_message() << endl;
             }
         }
         
