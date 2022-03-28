@@ -16,6 +16,7 @@ message ReadRequest{
     uint32 address = 1;
     uint32 size = 2;
     uint32 offset = 3;
+    bool requireCache = 4;
 }
 
 message WriteRequest{

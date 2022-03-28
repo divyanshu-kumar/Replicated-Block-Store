@@ -95,6 +95,10 @@ class BlockStorageClient {
             rr.set_address(address);
             rr.set_offset(0);
             rr.set_size(4096);
+            if(isCachingEnabled)
+                rr.set_requireCache(true);
+            else
+                rr.set_requireCache(false);
             // Set timeout for API
             std::chrono::system_clock::time_point deadline =
                 std::chrono::system_clock::now() +
