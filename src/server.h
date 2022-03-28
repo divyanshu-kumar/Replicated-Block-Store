@@ -214,6 +214,19 @@ class ServerReplication final : public BlockStorageService::Service {
         return Status::OK;
     }
 
+    Status rpc_subscribeForNotifications(
+        ServerContext* context, const SubscribeForNotifications* subscribeMessage,
+        ServerWriter<ClientCacheNotify>* writer) override {
+        // printf("%s : Client = %s\n", __func__, subscribeMessage->clientName());
+
+        // while (shouldRun) {
+        //     wait for some condition variable to signal when to write
+        //     OR
+        //     share this writer thing somewhere from where you can send a message + sleep()
+        // }
+
+        // EXIT ONLY WHEN ALL NOTIFICATION BUSINESS IS DONE WITH CLIENT
+    }
    private:
     std::unique_ptr<BlockStorageService::Stub> stub_;
 };

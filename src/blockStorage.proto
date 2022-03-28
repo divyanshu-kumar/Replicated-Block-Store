@@ -16,7 +16,7 @@ message ReadRequest{
     uint32 address = 1;
     uint32 size = 2;
     uint32 offset = 3;
-    bool requireCache = 4;
+    bool requirecache = 4;
 }
 
 message WriteRequest{
@@ -31,7 +31,16 @@ message WriteResult{
     int32 err =2;
 }
 
+message ClientCacheNotify {
+    int32 address = 1;
+}
+
+message SubscribeForNotifications {
+
+}
+
 service BlockStorageService {
     rpc rpc_read(ReadRequest) returns (ReadResult) {}
-    rpc rpc_write(WriteRequest) returns (WriteResult){}
+    rpc rpc_write(WriteRequest) returns (WriteResult) {}
+    rpc rpc_subscribeForNotifications(SubscribeForNotifications) returns (stream ClientCacheNotify) {}
 }

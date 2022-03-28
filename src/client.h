@@ -96,9 +96,9 @@ class BlockStorageClient {
             rr.set_offset(0);
             rr.set_size(4096);
             if(isCachingEnabled)
-                rr.set_requireCache(true);
+                rr.set_requirecache(true);
             else
-                rr.set_requireCache(false);
+                rr.set_requirecache(false);
             // Set timeout for API
             std::chrono::system_clock::time_point deadline =
                 std::chrono::system_clock::now() +
@@ -174,6 +174,21 @@ class BlockStorageClient {
             return wres.nbytes();
         } else {
             return -wres.err();
+        }
+    }
+
+    void rpc_subscribeForNotifications() {
+        ClientContext context;
+        ClientCacheNotify notifyMessage;
+        SubscribeForNotifications subReq;
+        std::unique_ptr<ClientReader<ClientCacheNotify> > reader(
+            stub_->rpc_subscribeForNotifications(&context, subReq));
+        while (reader->Read(&notifyMessage)) {
+            // Invalidate cache
+        }
+        const auto status = reader->Finish();
+        if (status != Status::OK) {
+            cout << __func__ << " Status returned not ok!" << endl;
         }
     }
 
