@@ -49,8 +49,6 @@ const int INITIAL_BACKOFF_MS = 10;
 const int MULTIPLIER = 1.5;
 const int numBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
 
-bool subscriberShouldRun = true;
-
 string  currentWorkDir,
         dataDirPath,
         writeTxLogsDirPath;
@@ -91,6 +89,7 @@ struct BackupOutOfSync {
 } backupSyncState;
 
 struct NotificationInfo {
+    unordered_map<string, bool> subscriberShouldRun;
     unordered_map<int, unordered_set<string>> subscribedClients;
     unordered_map<string, ServerWriter<ClientCacheNotify>*> clientWriters;
 
@@ -104,17 +103,28 @@ struct NotificationInfo {
         subscribedClients[address].erase(id);
     }
 
-    void AddClient(const string &id, ServerWriter<ClientCacheNotify>* clientWriter) {
-        cout << __func__ << " Adding Client " << " id " << id << endl;
-        clientWriters[id] = clientWriter;
+    void AddClient(const string &clientId, ServerWriter<ClientCacheNotify>* clientWriter) {
+        cout << __func__ << " Adding Client " << " id " << clientId << endl;
+        clientWriters[clientId] = clientWriter;
+        subscriberShouldRun[clientId] = true;
+    }
+
+    void RemoveClient(const string &clientId) {
+        cout << __func__ << " Removing Client " << " id " << clientId << endl;
+        clientWriters.erase(clientId);
+        subscriberShouldRun[clientId] = false;
+    }
+
+    bool ShouldKeepAlive(const string &clientId) {
+        return subscriberShouldRun[clientId];
     }
 
     void Notify(int address){
-        auto itr = subscribedClients.find(address);
-        if (itr == subscribedClients.end()) {
+        auto clientIds = subscribedClients[address];
+        if (clientIds.empty()) {
             return;
         }
-        for (auto &clientId : itr->second) {
+        for (auto clientId : clientIds) {
             NotifySingleClient(clientId, address);
             UnSubscribe(address, clientId);
         }
@@ -192,7 +202,7 @@ class ServerReplication final : public BlockStorageService::Service {
 
     Status rpc_read(ServerContext* context, const ReadRequest* rr,
                         ReadResult* reply) override {
-        // printf("%s : Address = %u\n", __func__, rr->address());
+        printf("%s : Address = %u\n", __func__, rr->address());
 
         bool isCachingRequested = rr->requirecache();
 
@@ -222,6 +232,8 @@ class ServerReplication final : public BlockStorageService::Service {
             return Status::OK;
         }
 
+        buf[min(res, (int)rr->size())] = '\0';
+        
         reply->set_bytesread(res);
         reply->set_buffer(buf);
         reply->set_err(0);
@@ -234,10 +246,12 @@ class ServerReplication final : public BlockStorageService::Service {
 
     Status rpc_write(ServerContext* context, const WriteRequest* wr,
                          WriteResult* reply) override {
-        // printf("%s : Address = %u\n", __func__, wr->address());
+        printf("%s : Address = %u\n", __func__, wr->address());
         lock_guard<mutex> guard(blockLock[wr->address()]);
         
-        notificationManager.Notify(wr->address());
+        if (role == "primary") {
+            notificationManager.Notify(wr->address());
+        }
 
         int res  = logWriteTransaction(wr->address());
 
@@ -284,9 +298,21 @@ class ServerReplication final : public BlockStorageService::Service {
         const string & clientId = subscribeMessage->identifier();
         notificationManager.AddClient(clientId, writer);
 
-        while (subscriberShouldRun) {
-            msleep(100);
+        while (notificationManager.ShouldKeepAlive(clientId)) {
+            msleep(500);
         }
+
+        return Status::OK;
+    }
+
+    Status rpc_unSubscribeForNotifications(ServerContext* context, const SubscribeForNotifications* unSubReq,
+        SubscribeForNotifications* reply) override
+    {
+        const string & clientId = unSubReq->identifier();
+
+        notificationManager.RemoveClient(clientId);
+
+        reply->set_identifier("Unsubscribed!");
 
         return Status::OK;
     }

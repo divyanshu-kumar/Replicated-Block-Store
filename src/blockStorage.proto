@@ -45,4 +45,5 @@ service BlockStorageService {
     rpc rpc_read(ReadRequest) returns (ReadResult) {}
     rpc rpc_write(WriteRequest) returns (WriteResult) {}
     rpc rpc_subscribeForNotifications(SubscribeForNotifications) returns (stream ClientCacheNotify) {}
+    rpc rpc_unSubscribeForNotifications(SubscribeForNotifications) returns (SubscribeForNotifications) {}
 }

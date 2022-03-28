@@ -42,13 +42,13 @@ const int MAX_NUM_RETRIES = 6;
 const int INITIAL_BACKOFF_MS = 50;
 const int MULTIPLIER = 2;
 const int numBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
-const int isCachingEnabled = false;
-const int stalenessLimit = 60 * 1e3; // milli-seconds
+const int isCachingEnabled = true;
+const int stalenessLimit = 10 * 1e3; // milli-seconds
+const int SERVER_OFFLINE_ERROR_CODE = -1011317;
+
 static string clientIdentifier;
 
-
-int SERVER_OFFLINE_ERROR_CODE = -1011317;
-
+std::thread notificationThread;
 
 inline void get_time(struct timespec *ts) {
     clock_gettime(CLOCK_MONOTONIC, ts);
@@ -83,7 +83,7 @@ class BlockStorageClient {
         : stub_(BlockStorageService::NewStub(channel)) {}
 
     int rpc_read(uint32_t address, string & buf) {
-        // printf("%s : Address = %d\n", __func__, address);
+        printf("%s : Address = %d\n", __func__, address);
 
         ReadResult rres;
 
@@ -97,11 +97,9 @@ class BlockStorageClient {
             rr.set_address(address);
             rr.set_offset(0);
             rr.set_size(4096);
+            rr.set_requirecache(isCachingEnabled);
             rr.set_identifier(clientIdentifier);
-            if(isCachingEnabled)
-                rr.set_requirecache(true);
-            else
-                rr.set_requirecache(false);
+
             // Set timeout for API
             std::chrono::system_clock::time_point deadline =
                 std::chrono::system_clock::now() +
@@ -135,7 +133,7 @@ class BlockStorageClient {
     }
 
     int rpc_write(uint32_t address, const string & buf) {
-        // printf("%s : Address = %d\n", __func__, address);
+        printf("%s : Address = %d\n", __func__, address);
 
         WriteResult wres;
 
@@ -185,10 +183,12 @@ class BlockStorageClient {
         ClientContext context;
         ClientCacheNotify notifyMessage;
         SubscribeForNotifications subReq;
+
         subReq.set_identifier(clientIdentifier);
 
         std::unique_ptr<ClientReader<ClientCacheNotify> > reader(
             stub_->rpc_subscribeForNotifications(&context, subReq));
+
         while (reader->Read(&notifyMessage)) {
             int address = notifyMessage.address();
             cout << __func__ << " invalidate cache with address: " << address << endl;
@@ -196,16 +196,29 @@ class BlockStorageClient {
                 cacheMap[address].invalidateCache();
             }
         }
-        const auto status = reader->Finish();
+
+        Status status = reader->Finish();
         if (!status.ok()) {
-            cout << __func__ << " Status returned not ok!" << endl;
+            cout << __func__ << " Status returned as " << status.error_message() << endl;
         }
     }
 
+    void rpc_unSubscribeForNotifications() {
+        ClientContext context;
+        SubscribeForNotifications unSubReq, unSubRes;
+
+        unSubReq.set_identifier(clientIdentifier);
+
+        Status status = stub_->rpc_unSubscribeForNotifications(&context, unSubReq, &unSubRes);
+
+        if (status.ok() == false) {
+            cout << __func__ << " : gRPC status not ok!" << endl;
+        }
+
+    }
    private:
     std::unique_ptr<BlockStorageService::Stub> stub_;
 };
-
 
 struct ServerInfo{
     string address;
@@ -265,12 +278,20 @@ bool isIPValid(const string & address) {
     return (port > 0 && port <= 65535);
 }
 
+void cacheInvalidationListener() {
+    cout << __func__ << " : Listening for notifications.." << endl;
+    (serverInfos[currentServerIdx].connection)->rpc_subscribeForNotifications();
+    cout << __func__ << " : Stopped listening for notifications now." << endl;
+}
+
 void initServerInfo(vector<string> addresses){
     for(string address : addresses){
         ServerInfo serverInfo;
         serverInfo.init(address);
         serverInfos.push_back(serverInfo);
     }
+    notificationThread = (std::thread(cacheInvalidationListener));
+    msleep(1);
 }
 
 bool CacheInfo::isStale() {

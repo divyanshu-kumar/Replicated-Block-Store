@@ -3,7 +3,14 @@
 int run_application();
 
 int switchServerConnection() {
+    cout << __func__ << " : Primary server is offline!" << endl;
+    
     currentServerIdx = (currentServerIdx+1)%serverInfos.size();
+    
+    notificationThread.join();
+    notificationThread = (std::thread(cacheInvalidationListener));
+    msleep(1);
+    
     printf("%s \t: Changing to server at %s...\n", __func__,
            serverInfos[currentServerIdx].address.c_str());
 }
@@ -13,20 +20,21 @@ static int client_read(uint32_t address, string & buf) {
 
     if (isCachingEnabled) {
         if (cacheMap[address].isCached && !cacheMap[address].isStale()) {
-            cout << __func__ << "Cached data found for file " << address << endl;
+            cout << __func__ << " : Cached data found for file " << address << endl;
             buf = cacheMap[address].data;
-            return res = buf.size();
+            return res = buf.length();
         }
         else {
             // cout << __func__ << "Cached data not found for file " << address << endl;
         }
     }
     res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf);
+    
     if (res == SERVER_OFFLINE_ERROR_CODE) {
         switchServerConnection();
         res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf);
         if(res < 0){
-            cout <<"Both servers are offline!" << endl;
+            cout << __func__ << " : Both servers are offline!" << endl;
             return -1;
         }
     }
@@ -39,7 +47,7 @@ static int client_read(uint32_t address, string & buf) {
 
 static int client_write(uint32_t address, const string & buf) {
     if (isCachingEnabled) {
-        // cout << __func__ << " : Invalidating cache for file " << address << endl;
+        cout << __func__ << " : Invalidating cache for file " << address << endl;
         cacheMap[address].invalidateCache();
     }
     int res = (serverInfos[currentServerIdx].connection)->rpc_write(address, buf);
@@ -47,7 +55,7 @@ static int client_write(uint32_t address, const string & buf) {
         switchServerConnection();
         int res = (serverInfos[currentServerIdx].connection)->rpc_write(address, buf);
         if(res < 0){
-            cout <<"Both servers are offline!" << endl;
+            cout << __func__ << " : Both servers are offline!" << endl;
             return -1;
         }
     }
@@ -128,6 +136,18 @@ int run_application() {
             printf("Didn't read 4k bytes from this file! Instead read %d bytes!\n", num_bytes_read);
         }
 
+        // Testing cache
+        get_time(&read_start);
+        
+        num_bytes_read = client_read(address, buf);
+        
+        get_time(&read_end);
+        readTimes.push_back(get_time_diff(&read_start, &read_end));
+        
+        if (num_bytes_read != 4096) {
+            printf("Didn't read 4k bytes from this file! Instead read %d bytes!\n", num_bytes_read);
+        }
+
         address = i % 5;//max(0, rand()) % totalBlocks;
         
         struct timespec write_start, write_end;
@@ -164,5 +184,9 @@ int run_application() {
             "maxRead    = %f \t maxWrite    = %f\n",
             __func__, meanReadTime, meanWriteTime, medianReadTime, medianWriteTime,
             readTimes.front(), writeTimes.front(), readTimes.back(), writeTimes.back());
+
+    (serverInfos[currentServerIdx].connection)->rpc_unSubscribeForNotifications();
+    notificationThread.join();
+
     return 0;
 }
