@@ -111,6 +111,9 @@ struct NotificationInfo {
 
     void Notify(int address){
         auto itr = subscribedClients.find(address);
+        if (itr == subscribedClients.end()) {
+            return;
+        }
         for (auto &clientId : itr->second) {
             NotifySingleClient(clientId, address);
             UnSubscribe(address, clientId);
@@ -199,11 +202,11 @@ class ServerReplication final : public BlockStorageService::Service {
         }
 
         char* buf = new char[rr->size() + 1];
-        
+
         string blockAddress = dataDirPath + "/" + to_string(rr->address());
-        
+
         int fd = open(blockAddress.c_str(), O_RDONLY);
-        
+
         if (fd == -1) {
             reply->set_err(errno);
             printf("%s \n", __func__);
