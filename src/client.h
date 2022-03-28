@@ -42,8 +42,10 @@ const int MAX_NUM_RETRIES = 6;
 const int INITIAL_BACKOFF_MS = 50;
 const int MULTIPLIER = 2;
 const int numBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
-const int isCachingEnabled = true;
+const int isCachingEnabled = false;
 const int stalenessLimit = 60 * 1e3; // milli-seconds
+static string clientIdentifier;
+
 
 int SERVER_OFFLINE_ERROR_CODE = -1011317;
 
@@ -95,6 +97,7 @@ class BlockStorageClient {
             rr.set_address(address);
             rr.set_offset(0);
             rr.set_size(4096);
+            rr.set_identifier(clientIdentifier);
             if(isCachingEnabled)
                 rr.set_requirecache(true);
             else
@@ -147,6 +150,7 @@ class BlockStorageClient {
             wreq.set_buffer(buf);
             wreq.set_offset(0);
             wreq.set_size(4096);
+            wreq.set_identifier(clientIdentifier);
 
             std::chrono::system_clock::time_point deadline =
                 std::chrono::system_clock::now() +
@@ -181,13 +185,19 @@ class BlockStorageClient {
         ClientContext context;
         ClientCacheNotify notifyMessage;
         SubscribeForNotifications subReq;
+        subReq.set_identifier(clientIdentifier);
+
         std::unique_ptr<ClientReader<ClientCacheNotify> > reader(
             stub_->rpc_subscribeForNotifications(&context, subReq));
         while (reader->Read(&notifyMessage)) {
-            // Invalidate cache
+            int address = notifyMessage.address();
+            cout << __func__ << " invalidate cache with address: " << address << endl;
+            if (isCachingEnabled) {
+                cacheMap[address].invalidateCache();
+            }
         }
         const auto status = reader->Finish();
-        if (status != Status::OK) {
+        if (!status.ok()) {
             cout << __func__ << " Status returned not ok!" << endl;
         }
     }
@@ -276,4 +286,19 @@ void CacheInfo::cacheData(const string & data) {
     this->data = data;
     isCached = true;
     get_time(&lastRefreshTs);
+}
+
+void generateClientIdentifier(){
+    int identifierLength = 32;
+
+    const char alphanum[] =
+                                "0123456789"
+                                "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                "abcdefghijklmnopqrstuvwxyz";
+    clientIdentifier.reserve(identifierLength);
+
+    for (int i = 0; i < identifierLength; ++i) {
+        clientIdentifier += alphanum[rand() % (sizeof(alphanum) - 1)];
+    }
+    cout << "generated client identifier " << clientIdentifier << endl;
 }

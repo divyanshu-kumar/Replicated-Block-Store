@@ -17,6 +17,7 @@ message ReadRequest{
     uint32 size = 2;
     uint32 offset = 3;
     bool requirecache = 4;
+    string identifier = 5;
 }
 
 message WriteRequest{
@@ -24,6 +25,7 @@ message WriteRequest{
     bytes buffer = 2;
     uint32 size = 3;
     uint32 offset = 4;
+    string identifier = 5;
 }
 
 message WriteResult{
@@ -36,7 +38,7 @@ message ClientCacheNotify {
 }
 
 message SubscribeForNotifications {
-
+    string identifier = 1;
 }
 
 service BlockStorageService {

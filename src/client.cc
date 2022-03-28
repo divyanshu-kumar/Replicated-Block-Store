@@ -94,6 +94,8 @@ int main(int argc, char *argv[]) {
         addresses = {"localhost:50051", "localhost:50053"};
     }
 
+    generateClientIdentifier();
+
     initServerInfo(addresses);
 
     printf("%s \t: Connecting to server at %s...\n", __func__,
@@ -101,7 +103,6 @@ int main(int argc, char *argv[]) {
 
     return run_application();
 }
-
 
 
 int run_application() {

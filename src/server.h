@@ -18,6 +18,8 @@
 #include <chrono>
 #include <vector>
 #include <arpa/inet.h>
+#include <unordered_set>
+#include <unordered_map>
 
 #include "blockStorage.grpc.pb.h"
 
@@ -47,6 +49,8 @@ const int INITIAL_BACKOFF_MS = 10;
 const int MULTIPLIER = 1.5;
 const int numBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
 
+bool subscriberShouldRun = true;
+
 string  currentWorkDir,
         dataDirPath,
         writeTxLogsDirPath;
@@ -72,6 +76,7 @@ string  parseArgument(const string & argumentString, const string & option);
 bool    isRoleValid();
 bool    isIPValid(const string & address);
 int     localRead(const int address, char * buf);
+int     msleep(long msec);
 
 struct BackupOutOfSync {
     bool isOutOfSync;
@@ -84,6 +89,51 @@ struct BackupOutOfSync {
 
     int sync();
 } backupSyncState;
+
+struct NotificationInfo {
+    unordered_map<int, unordered_set<string>> subscribedClients;
+    unordered_map<string, ServerWriter<ClientCacheNotify>*> clientWriters;
+
+    void Subscribe(int address, const string &id) {
+        cout << __func__ << " for address " << address << " id " << id << endl;
+        subscribedClients[address].insert(id);
+    }
+
+    void UnSubscribe(int address, const string &id) {
+        cout << __func__ << " for address " << address << " id " << id << endl;
+        subscribedClients[address].erase(id);
+    }
+
+    void AddClient(const string &id, ServerWriter<ClientCacheNotify>* clientWriter) {
+        cout << __func__ << " Adding Client " << " id " << id << endl;
+        clientWriters[id] = clientWriter;
+    }
+
+    void Notify(int address){
+        auto itr = subscribedClients.find(address);
+        for (auto &clientId : itr->second) {
+            NotifySingleClient(clientId, address);
+            UnSubscribe(address, clientId);
+        }
+    }
+
+    void NotifySingleClient(const string &id, const int &address){
+        cout << __func__ << " Notify Client for address " << address << " id " << id << endl;
+        try{
+            ServerWriter<ClientCacheNotify>* writer = clientWriters[id];
+            ClientCacheNotify notifyReply;
+            notifyReply.set_address(address);
+
+            writer->Write(notifyReply);
+        } catch(const std::exception& ex){
+            std::ostringstream sts;
+            sts << "Error contacting client " << id << endl;
+            std::cerr << sts.str() << endl;
+        }
+    }
+};
+
+static NotificationInfo notificationManager;
 
 class ServerReplication final : public BlockStorageService::Service {
    public:
@@ -141,6 +191,13 @@ class ServerReplication final : public BlockStorageService::Service {
                         ReadResult* reply) override {
         // printf("%s : Address = %u\n", __func__, rr->address());
 
+        bool isCachingRequested = rr->requirecache();
+
+        if (isCachingRequested) {
+            string clientId = rr->identifier();
+            notificationManager.Subscribe(rr->address(), clientId);
+        }
+
         char* buf = new char[rr->size() + 1];
         
         string blockAddress = dataDirPath + "/" + to_string(rr->address());
@@ -177,6 +234,8 @@ class ServerReplication final : public BlockStorageService::Service {
         // printf("%s : Address = %u\n", __func__, wr->address());
         lock_guard<mutex> guard(blockLock[wr->address()]);
         
+        notificationManager.Notify(wr->address());
+
         int res  = logWriteTransaction(wr->address());
 
         int bytes_written_local = localWrite(wr);
@@ -217,15 +276,16 @@ class ServerReplication final : public BlockStorageService::Service {
     Status rpc_subscribeForNotifications(
         ServerContext* context, const SubscribeForNotifications* subscribeMessage,
         ServerWriter<ClientCacheNotify>* writer) override {
-        // printf("%s : Client = %s\n", __func__, subscribeMessage->clientName());
+        printf("%s : Client = %s\n", __func__, subscribeMessage->identifier().c_str());
 
-        // while (shouldRun) {
-        //     wait for some condition variable to signal when to write
-        //     OR
-        //     share this writer thing somewhere from where you can send a message + sleep()
-        // }
+        const string & clientId = subscribeMessage->identifier();
+        notificationManager.AddClient(clientId, writer);
 
-        // EXIT ONLY WHEN ALL NOTIFICATION BUSINESS IS DONE WITH CLIENT
+        while (subscriberShouldRun) {
+            msleep(100);
+        }
+
+        return Status::OK;
     }
    private:
     std::unique_ptr<BlockStorageService::Stub> stub_;
@@ -552,4 +612,22 @@ int localRead(const int address, char * buf) {
     close(fd);
     
     return 0;
+}
+
+int msleep(long msec) {
+    struct timespec ts;
+    int res;
+    if (msec < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    ts.tv_sec = msec / 1000;
+    ts.tv_nsec = (msec % 1000) * 1000000;
+
+    do {
+        res = nanosleep(&ts, &ts);
+    } while (res && errno == EINTR);
+
+    return res;
 }
