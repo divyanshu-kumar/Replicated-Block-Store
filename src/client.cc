@@ -15,24 +15,49 @@ int switchServerConnection() {
            serverInfos[currentServerIdx].address.c_str());
 }
 
-static int client_read(uint32_t address, string & buf) {
+bool checkIfOffsetIsAligned(uint32_t &offset){
+    return offset % BLOCK_SIZE_BYTES == 0;
+}
+
+bool cacheStalenessValidation(const vector<uint32_t> &addressVector){
+    for(auto address : addressVector){
+        if(!cacheMap[address].isCached || cacheMap[address].isStale())
+            return false;
+    }
+    return true;
+}
+
+static int client_read(uint32_t offset, string & buf) {
     int res = 0;
 
+    uint32_t address = offset  / BLOCK_SIZE_BYTES;
+    vector<uint32_t> addressVector = {address};
+    bool isAlignedRead = checkIfOffsetIsAligned(offset);
+    uint32_t readSize = BLOCK_SIZE_BYTES;
+    if(!isAlignedRead){
+        addressVector.push_back(address+1);
+        readSize = 2 * BLOCK_SIZE_BYTES;
+    }
+
     if (isCachingEnabled) {
-        if (cacheMap[address].isCached && !cacheMap[address].isStale()) {
-            cout << __func__ << " : Cached data found for file " << address << endl;
+        if (cacheStalenessValidation(addressVector)) {
+            cout << __func__ << " : Cached data found for file with Address " << address << endl;
+            int startIdx = offset % BLOCK_SIZE_BYTES;
             buf = cacheMap[address].data;
+            if(!isAlignedRead)
+                buf += cacheMap[address+1].data;
+            buf = buf.substr(startIdx, BLOCK_SIZE_BYTES);
             return res = buf.length();
         }
         else {
             // cout << __func__ << "Cached data not found for file " << address << endl;
         }
     }
-    res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf);
     
+    res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf, readSize, offset);
     if (res == SERVER_OFFLINE_ERROR_CODE) {
         switchServerConnection();
-        res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf);
+        res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf, readSize, offset);
         if(res < 0){
             cout << __func__ << " : Both servers are offline!" << endl;
             return -1;
@@ -40,20 +65,31 @@ static int client_read(uint32_t address, string & buf) {
     }
     if (isCachingEnabled) {
         // cout << __func__ << "Cached data successfully for file " << address << endl;
-        cacheMap[address].cacheData(buf);
+        cacheMap[address].cacheData(buf.substr(0,BLOCK_SIZE_BYTES));
+        if(!isAlignedRead) {
+            cacheMap[address+1].cacheData(buf.substr(BLOCK_SIZE_BYTES, BLOCK_SIZE_BYTES));
+            buf = buf.substr(offset, BLOCK_SIZE_BYTES);
+        }
     }
     return res;
 }
 
-static int client_write(uint32_t address, const string & buf) {
+static int client_write(uint32_t offset, const string & buf) {
+
+    uint32_t address = offset  / BLOCK_SIZE_BYTES;
+    bool isAlignedWrite = checkIfOffsetIsAligned(offset);
+
     if (isCachingEnabled) {
         cout << __func__ << " : Invalidating cache for file " << address << endl;
         cacheMap[address].invalidateCache();
+        if(!isAlignedWrite)
+            cacheMap[address+1].invalidateCache();
     }
-    int res = (serverInfos[currentServerIdx].connection)->rpc_write(address, buf);
+    
+    int res = (serverInfos[currentServerIdx].connection)->rpc_write(address, buf, offset);
     if(res == SERVER_OFFLINE_ERROR_CODE) {
         switchServerConnection();
-        int res = (serverInfos[currentServerIdx].connection)->rpc_write(address, buf);
+        int res = (serverInfos[currentServerIdx].connection)->rpc_write(address, buf, offset);
         if(res < 0){
             cout << __func__ << " : Both servers are offline!" << endl;
             return -1;
@@ -127,7 +163,7 @@ int run_application() {
         struct timespec read_start, read_end;
         get_time(&read_start);
         
-        int num_bytes_read = client_read(address, buf);
+        int num_bytes_read = client_read(address * BLOCK_SIZE_BYTES, buf);
         
         get_time(&read_end);
         readTimes.push_back(make_pair(get_time_diff(&read_start, &read_end), address));
@@ -139,7 +175,7 @@ int run_application() {
         // Testing cache
         get_time(&read_start);
         
-        num_bytes_read = client_read(address, buf);
+        num_bytes_read = client_read(address * BLOCK_SIZE_BYTES, buf);
         
         get_time(&read_end);
         readTimes.push_back(make_pair(get_time_diff(&read_start, &read_end), address));
@@ -155,7 +191,7 @@ int run_application() {
         struct timespec write_start, write_end;
         get_time(&write_start);
         
-        int num_bytes_write = client_write(address, write_data);
+        int num_bytes_write = client_write(address * BLOCK_SIZE_BYTES, write_data);
         
         get_time(&write_end);
         writeTimes.push_back(make_pair(get_time_diff(&write_start, &write_end), address));

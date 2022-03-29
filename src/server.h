@@ -75,6 +75,7 @@ bool    isRoleValid();
 bool    isIPValid(const string & address);
 int     localRead(const int address, char * buf);
 int     msleep(long msec);
+bool    checkIfOffsetIsAligned(unsigned int offset);
 
 struct BackupOutOfSync {
     bool isOutOfSync;
@@ -125,6 +126,9 @@ struct NotificationInfo {
             return;
         }
         for (auto clientId : clientIds) {
+            if (clientWriters.find(clientId) == clientWriters.end()) {
+                continue;
+            }
             if (writerClientId != clientId) {
                 NotifySingleClient(clientId, address);
             }
@@ -158,7 +162,7 @@ class ServerReplication final : public BlockStorageService::Service {
     ServerReplication(std::shared_ptr<Channel> channel)
         : stub_(BlockStorageService::NewStub(channel)) {}
     
-    int rpc_write(uint32_t address, const string & buf) {
+    int rpc_write(uint32_t address, const string & buf, uint32_t offset) {
         // printf("%s : Address = %d\n", __func__, address);
         WriteResult wres;
 
@@ -170,8 +174,8 @@ class ServerReplication final : public BlockStorageService::Service {
             WriteRequest wreq;
             wreq.set_address(address);
             wreq.set_buffer(buf);
-            wreq.set_offset(0);
-            wreq.set_size(4096);
+            wreq.set_offset(offset);
+            wreq.set_size(BLOCK_SIZE_BYTES);
 
             std::chrono::system_clock::time_point deadline =
                 std::chrono::system_clock::now() +
@@ -205,42 +209,45 @@ class ServerReplication final : public BlockStorageService::Service {
     Status rpc_read(ServerContext* context, const ReadRequest* rr,
                         ReadResult* reply) override {
         printf("%s : Address = %u\n", __func__, rr->address());
-
+        bool isReadAligned = checkIfOffsetIsAligned(rr->offset());
         bool isCachingRequested = rr->requirecache();
 
         if (isCachingRequested) {
             string clientId = rr->identifier();
             notificationManager.Subscribe(rr->address(), clientId);
+            if(!isReadAligned)
+                notificationManager.Subscribe(rr->address() + 1, clientId);
         }
 
         char* buf = new char[rr->size() + 1];
+        int res = 0;
 
-        string blockAddress = dataDirPath + "/" + to_string(rr->address());
+        for(int idx =0; idx < rr->size()/BLOCK_SIZE_BYTES; idx++) {
+            string blockAddress = dataDirPath + "/" + to_string(rr->address() + idx);
+            int fd = open(blockAddress.c_str(), O_RDONLY);
 
-        int fd = open(blockAddress.c_str(), O_RDONLY);
+            if (fd == -1) {
+                reply->set_err(errno);
+                printf("%s \n", __func__);
+                perror(strerror(errno));
+                return Status::OK;
+            }
 
-        if (fd == -1) {
-            reply->set_err(errno);
-            printf("%s \n", __func__);
-            perror(strerror(errno));
-            return Status::OK;
+            res = pread(fd, buf + (idx * BLOCK_SIZE_BYTES), BLOCK_SIZE_BYTES, 0);
+            if (res == -1) {
+                reply->set_err(errno);
+                printf("%s \n", __func__);
+                perror(strerror(errno));
+                return Status::OK;
+            }
+            if (fd > 0) close(fd);
         }
 
-        int res = pread(fd, buf, rr->size(), rr->offset());
-        if (res == -1) {
-            reply->set_err(errno);
-            printf("%s \n", __func__);
-            perror(strerror(errno));
-            return Status::OK;
-        }
-
-        buf[min(res, (int)rr->size())] = '\0';
+        buf[(int)rr->size()] = '\0';
         
         reply->set_bytesread(res);
         reply->set_buffer(buf);
         reply->set_err(0);
-
-        if (fd > 0) close(fd);
         free(buf);
 
         return Status::OK;
@@ -249,13 +256,22 @@ class ServerReplication final : public BlockStorageService::Service {
     Status rpc_write(ServerContext* context, const WriteRequest* wr,
                          WriteResult* reply) override {
         printf("%s : Address = %u\n", __func__, wr->address());
+        bool isAlignedWrite = checkIfOffsetIsAligned(wr->offset());
+
         lock_guard<mutex> guard(blockLock[wr->address()]);
+        if(!isAlignedWrite)
+            lock_guard<mutex> guard(blockLock[wr->address()+1]);
         
+
         if (role == "primary") {
             notificationManager.Notify(wr->address(), wr->identifier());
+            if(!isAlignedWrite)
+                notificationManager.Notify(wr->address()+1, wr->identifier());
         }
 
         int res  = logWriteTransaction(wr->address());
+        if(!isAlignedWrite)
+            res  = logWriteTransaction(wr->address() + 1);
 
         int bytes_written_local = localWrite(wr);
 
@@ -272,17 +288,24 @@ class ServerReplication final : public BlockStorageService::Service {
         if (bytes_written_local != -1 && role == "primary") {
             if (backupSyncState.isOutOfSync) {
                 backupSyncState.logOutOfSync(wr->address());
+                if(!isAlignedWrite)
+                    backupSyncState.logOutOfSync(wr->address() + 1);
                 backupSyncState.sync();
             }
             else {
-                int bytes_written_backup = this->rpc_write(wr->address(), wr->buffer());
+                int bytes_written_backup = this->rpc_write(wr->address(), wr->buffer(), wr->offset());
                 if (bytes_written_local != bytes_written_backup){ 
                     backupSyncState.logOutOfSync(wr->address());
+                    if(!isAlignedWrite)
+                        backupSyncState.logOutOfSync(wr->address() + 1);
                 }
             }
         }
         
         res  = unLogWriteTransaction(wr->address());
+        if(!isAlignedWrite)
+            res  = unLogWriteTransaction(wr->address() + 1);
+
 
         if (res == -1) {
             printf("%s : Error : Failed to unlog the write the transaction.", 
@@ -349,7 +372,7 @@ int BackupOutOfSync::sync() {
             return -1;
         }
         
-        res = serverReplication->rpc_write(blockIdx, buf);
+        res = serverReplication->rpc_write(blockIdx, buf, 0);
         if (res < 0) {
             // cout <<  __func__ << " Error sending file" << endl;
             return -1;
@@ -393,6 +416,7 @@ int unLogWriteTransaction(int address){
 }
 
 int localWrite(const WriteRequest* wr) {
+    bool isWriteAligned = checkIfOffsetIsAligned(wr->offset());
     string blockAddress = dataDirPath + "/" + to_string(wr->address());
 
     int fd = open(blockAddress.c_str(), O_WRONLY);
@@ -400,11 +424,25 @@ int localWrite(const WriteRequest* wr) {
         return fd;
     }
 
-    int res = pwrite(fd, wr->buffer().c_str(), wr->size(), wr->offset());
-    fsync(fd); 
+    int startIdx = isWriteAligned ? 0 : (wr->offset() % BLOCK_SIZE_BYTES);
+    //int res = pwrite(fd, wr->buffer().substr(0, (BLOCK_SIZE_BYTES - startIdx)).c_str(), BLOCK_SIZE_BYTES - startIdx, startIdx);
+    int res = pwrite(fd, wr->buffer().c_str(), BLOCK_SIZE_BYTES - startIdx, startIdx);
+    fsync(fd);
     close(fd);
     
-    return res;
+    if (!isWriteAligned) {
+        blockAddress = dataDirPath + "/" + to_string(wr->address()+1);
+
+        fd = open(blockAddress.c_str(), O_WRONLY);
+        if (fd == -1) {
+            return fd;
+        }
+
+        res = pwrite(fd, wr->buffer().substr((BLOCK_SIZE_BYTES - startIdx)).c_str(), startIdx, 0);
+        fsync(fd); 
+        close(fd);
+    }
+    return BLOCK_SIZE_BYTES;
 }
 
 int makeFolder(const string & folderPath) {
@@ -661,4 +699,8 @@ int msleep(long msec) {
     } while (res && errno == EINTR);
 
     return res;
+}
+
+bool checkIfOffsetIsAligned(unsigned int offset){
+    return offset % BLOCK_SIZE_BYTES == 0;
 }

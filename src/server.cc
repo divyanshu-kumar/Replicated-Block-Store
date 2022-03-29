@@ -16,7 +16,7 @@ void RunServer() {
 
 int main(int argc, char** argv) {
     srand(time(NULL));
-
+    
     string argumentString;
 
     if (argc > 1) {
@@ -36,8 +36,8 @@ int main(int argc, char** argv) {
             role = "";
         }
     }
-    
-    if (role.empty() || my_address.empty()) {
+
+     if (role.empty() || my_address.empty()) {
         printf( "Enter arguments like below and try again - \n"
                 "./server --role=[primary or backup] "
                 "--my_address=[IP:PORT] --other_address=[IP:PORT]\n");

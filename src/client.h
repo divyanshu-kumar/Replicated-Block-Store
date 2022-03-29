@@ -82,7 +82,7 @@ class BlockStorageClient {
     BlockStorageClient(std::shared_ptr<Channel> channel)
         : stub_(BlockStorageService::NewStub(channel)) {}
 
-    int rpc_read(uint32_t address, string & buf) {
+    int rpc_read(uint32_t address, string & buf, uint32_t size, uint32_t offset) {
         printf("%s : Address = %d\n", __func__, address);
 
         ReadResult rres;
@@ -95,8 +95,8 @@ class BlockStorageClient {
             ClientContext clientContext;
             ReadRequest rr;
             rr.set_address(address);
-            rr.set_offset(0);
-            rr.set_size(4096);
+            rr.set_offset(offset);
+            rr.set_size(size);
             rr.set_requirecache(isCachingEnabled);
             rr.set_identifier(clientIdentifier);
 
@@ -133,7 +133,7 @@ class BlockStorageClient {
         }
     }
 
-    int rpc_write(uint32_t address, const string & buf) {
+    int rpc_write(uint32_t address, const string & buf, uint32_t offset) {
         printf("%s : Address = %d\n", __func__, address);
 
         WriteResult wres;
@@ -147,8 +147,8 @@ class BlockStorageClient {
             WriteRequest wreq;
             wreq.set_address(address);
             wreq.set_buffer(buf);
-            wreq.set_offset(0);
-            wreq.set_size(4096);
+            wreq.set_offset(offset);
+            wreq.set_size(BLOCK_SIZE_BYTES);
             wreq.set_identifier(clientIdentifier);
 
             std::chrono::system_clock::time_point deadline =
