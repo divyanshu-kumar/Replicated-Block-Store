@@ -59,6 +59,9 @@ static string   role,
 
 static vector<std::mutex> blockLock(numBlocks);
 
+thread heartbeatThread;
+bool heartbeatShouldRun;
+
 void    get_time(struct timespec* ts);
 double  get_time_diff(struct timespec* before, struct timespec* after);
 string  getCurrentWorkingDir();
@@ -341,6 +344,43 @@ class ServerReplication final : public BlockStorageService::Service {
 
         return Status::OK;
     }
+
+    void rpc_heartbeatSender() {
+        ClientContext context;
+        Heartbeat heartbeatReq, heartbeatRes;
+
+        heartbeatReq.set_msg("");
+
+        std::unique_ptr<ClientReader<Heartbeat> > reader(
+            stub_->rpc_heartbeatListener(&context, heartbeatReq));
+
+        while (reader->Read(&heartbeatRes)) {
+            auto message = heartbeatRes.msg();
+            cout << __func__ << " Heartbeat msg received back on sender: " << message << endl;
+            // if (isCachingEnabled) {
+            //     cacheMap[address].invalidateCache();
+            // }
+        }
+
+        Status status = reader->Finish();
+        if (!status.ok()) {
+            //cout << __func__ << " Status returned as " << status.error_message() << endl;
+        }
+    }
+
+    Status rpc_heartbeatListener(
+        ServerContext* context, const Heartbeat* heartbeatMessage,
+        ServerWriter<Heartbeat>* writer) override {
+
+        cout << __func__ << " Heartbeat msg received on listener: " << heartbeatMessage->msg() << endl;
+
+        while (true) {
+            msleep(500);
+        }
+
+        return Status::OK;
+    }
+
    private:
     std::unique_ptr<BlockStorageService::Stub> stub_;
 };
@@ -348,6 +388,7 @@ class ServerReplication final : public BlockStorageService::Service {
 static ServerReplication *serverReplication;
 
 void BackupOutOfSync::logOutOfSync(const int address) {
+    cout << __func__ << " : Out of sync address = " << address << endl;
     isOutOfSync = true;
     // const int four_kb = 4 * one_kb;
     outOfSyncBlocks[address] = true;
@@ -425,8 +466,8 @@ int localWrite(const WriteRequest* wr) {
     }
 
     int startIdx = isWriteAligned ? 0 : (wr->offset() % BLOCK_SIZE_BYTES);
-    //int res = pwrite(fd, wr->buffer().substr(0, (BLOCK_SIZE_BYTES - startIdx)).c_str(), BLOCK_SIZE_BYTES - startIdx, startIdx);
-    int res = pwrite(fd, wr->buffer().c_str(), BLOCK_SIZE_BYTES - startIdx, startIdx);
+    int res = pwrite(fd, wr->buffer().substr(0, (BLOCK_SIZE_BYTES - startIdx)).c_str(), BLOCK_SIZE_BYTES - startIdx, startIdx);
+    // int res = pwrite(fd, wr->buffer().c_str(), BLOCK_SIZE_BYTES - startIdx, startIdx);
     fsync(fd);
     close(fd);
     
@@ -703,4 +744,18 @@ int msleep(long msec) {
 
 bool checkIfOffsetIsAligned(unsigned int offset){
     return offset % BLOCK_SIZE_BYTES == 0;
+}
+
+void runHeartbeat() {
+    cout << __func__ << " : Starting heartbeat service!" << endl;
+    while (heartbeatShouldRun) {
+        serverReplication->rpc_heartbeatSender();
+        msleep(5);
+        // Do something here
+        if (role == "backup") {
+            role = "primary";
+        }
+    }
+    //cout << __func__ << " : Heartbeat service stopped now! Other server is down" << endl;
+    
 }

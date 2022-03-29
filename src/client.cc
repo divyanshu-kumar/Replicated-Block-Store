@@ -28,6 +28,7 @@ bool cacheStalenessValidation(const vector<uint32_t> &addressVector){
 }
 
 static int client_read(uint32_t offset, string & buf) {
+    // printf("%s : Address = %d\n", __func__, offset);
     int res = 0;
 
     uint32_t address = offset  / BLOCK_SIZE_BYTES;
@@ -55,6 +56,7 @@ static int client_read(uint32_t offset, string & buf) {
     }
     
     res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf, readSize, offset);
+
     if (res == SERVER_OFFLINE_ERROR_CODE) {
         switchServerConnection();
         res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf, readSize, offset);
@@ -156,9 +158,10 @@ int run_application() {
 
     int totalBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
 
-    for (int i = 0; i < 100; i++) {
+    const int NUM_RUNS = 8;
+    for (int i = 0; i < NUM_RUNS; i++) {
         string buf;
-        uint32_t address = i % 5;//max(0, rand()) % totalBlocks;
+        uint32_t address = i % NUM_RUNS;//max(0, rand()) % totalBlocks;
         
         struct timespec read_start, read_end;
         get_time(&read_start);
@@ -184,9 +187,9 @@ int run_application() {
             printf("Didn't read 4k bytes from this file! Instead read %d bytes!\n", num_bytes_read);
         }
 
-        msleep(100 * max(0, rand() % 5));
+        // msleep(100 * max(0, rand() % ));
 
-        address = i % 5;//max(0, rand()) % totalBlocks;
+        address = i % NUM_RUNS;//max(0, rand()) % totalBlocks;
         
         struct timespec write_start, write_end;
         get_time(&write_start);
@@ -201,6 +204,10 @@ int run_application() {
         }
         
         msleep(max(0, rand() % 10));
+
+        if (i % 2 == 1) {
+            msleep(10000);
+        }
     }
 
     double meanReadTime = 0;

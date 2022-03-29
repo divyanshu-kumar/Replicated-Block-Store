@@ -54,7 +54,13 @@ int main(int argc, char** argv) {
 
     rollbackUncommittedWrites();
 
+    heartbeatShouldRun = true;
+    heartbeatThread = thread(runHeartbeat);
+
     RunServer();
+
+    heartbeatShouldRun = false;
+    heartbeatThread.join();
 
     return 0;
 }
