@@ -32,10 +32,9 @@ int main(int argc, char** argv) {
         my_address = parseArgument(argumentString, "--my_address=");
         other_address = parseArgument(argumentString, "--other_address=");
 
-        if (!isRoleValid() || !isIPValid(my_address) ||
-            !isIPValid(other_address)) {
-            cout << "Role = " << role << "\nMy Address = " << my_address
-                 << "\nOther Address = " << other_address << endl;
+        if (!isRoleValid(role) || !isIPValid(my_address) || !isIPValid(other_address)) {
+            cout << "Role = " << role << "\nMy Address = " << my_address << 
+            "\nOther Address = " << other_address << endl;
             role = "";
         }
     }
@@ -54,7 +53,7 @@ int main(int argc, char** argv) {
     serverReplication = new ServerReplication(grpc::CreateChannel(
         other_address.c_str(), grpc::InsecureChannelCredentials()));
 
-    makeFolderAndBlocks();
+    makeFolderAndBlocks(currentWorkDir, dataDirPath, writeTxLogsDirPath);
 
     rollbackUncommittedWrites();
 

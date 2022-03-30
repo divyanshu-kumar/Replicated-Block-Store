@@ -24,6 +24,9 @@ namespace BlockStorage {
 static const char* BlockStorageService_method_names[] = {
   "/BlockStorage.BlockStorageService/rpc_read",
   "/BlockStorage.BlockStorageService/rpc_write",
+  "/BlockStorage.BlockStorageService/rpc_subscribeForNotifications",
+  "/BlockStorage.BlockStorageService/rpc_unSubscribeForNotifications",
+  "/BlockStorage.BlockStorageService/rpc_heartbeatListener",
 };
 
 std::unique_ptr< BlockStorageService::Stub> BlockStorageService::NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options) {
@@ -35,6 +38,9 @@ std::unique_ptr< BlockStorageService::Stub> BlockStorageService::NewStub(const s
 BlockStorageService::Stub::Stub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options)
   : channel_(channel), rpcmethod_rpc_read_(BlockStorageService_method_names[0], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   , rpcmethod_rpc_write_(BlockStorageService_method_names[1], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_rpc_subscribeForNotifications_(BlockStorageService_method_names[2], options.suffix_for_stats(),::grpc::internal::RpcMethod::SERVER_STREAMING, channel)
+  , rpcmethod_rpc_unSubscribeForNotifications_(BlockStorageService_method_names[3], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_rpc_heartbeatListener_(BlockStorageService_method_names[4], options.suffix_for_stats(),::grpc::internal::RpcMethod::SERVER_STREAMING, channel)
   {}
 
 ::grpc::Status BlockStorageService::Stub::rpc_read(::grpc::ClientContext* context, const ::BlockStorage::ReadRequest& request, ::BlockStorage::ReadResult* response) {
@@ -83,6 +89,61 @@ void BlockStorageService::Stub::async::rpc_write(::grpc::ClientContext* context,
   return result;
 }
 
+::grpc::ClientReader< ::BlockStorage::ClientCacheNotify>* BlockStorageService::Stub::rpc_subscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request) {
+  return ::grpc::internal::ClientReaderFactory< ::BlockStorage::ClientCacheNotify>::Create(channel_.get(), rpcmethod_rpc_subscribeForNotifications_, context, request);
+}
+
+void BlockStorageService::Stub::async::rpc_subscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::grpc::ClientReadReactor< ::BlockStorage::ClientCacheNotify>* reactor) {
+  ::grpc::internal::ClientCallbackReaderFactory< ::BlockStorage::ClientCacheNotify>::Create(stub_->channel_.get(), stub_->rpcmethod_rpc_subscribeForNotifications_, context, request, reactor);
+}
+
+::grpc::ClientAsyncReader< ::BlockStorage::ClientCacheNotify>* BlockStorageService::Stub::Asyncrpc_subscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq, void* tag) {
+  return ::grpc::internal::ClientAsyncReaderFactory< ::BlockStorage::ClientCacheNotify>::Create(channel_.get(), cq, rpcmethod_rpc_subscribeForNotifications_, context, request, true, tag);
+}
+
+::grpc::ClientAsyncReader< ::BlockStorage::ClientCacheNotify>* BlockStorageService::Stub::PrepareAsyncrpc_subscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncReaderFactory< ::BlockStorage::ClientCacheNotify>::Create(channel_.get(), cq, rpcmethod_rpc_subscribeForNotifications_, context, request, false, nullptr);
+}
+
+::grpc::Status BlockStorageService::Stub::rpc_unSubscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::BlockStorage::SubscribeForNotifications* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::BlockStorage::SubscribeForNotifications, ::BlockStorage::SubscribeForNotifications, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_rpc_unSubscribeForNotifications_, context, request, response);
+}
+
+void BlockStorageService::Stub::async::rpc_unSubscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::BlockStorage::SubscribeForNotifications* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::BlockStorage::SubscribeForNotifications, ::BlockStorage::SubscribeForNotifications, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_rpc_unSubscribeForNotifications_, context, request, response, std::move(f));
+}
+
+void BlockStorageService::Stub::async::rpc_unSubscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::BlockStorage::SubscribeForNotifications* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_rpc_unSubscribeForNotifications_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::BlockStorage::SubscribeForNotifications>* BlockStorageService::Stub::PrepareAsyncrpc_unSubscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::BlockStorage::SubscribeForNotifications, ::BlockStorage::SubscribeForNotifications, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_rpc_unSubscribeForNotifications_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::BlockStorage::SubscribeForNotifications>* BlockStorageService::Stub::Asyncrpc_unSubscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncrpc_unSubscribeForNotificationsRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
+::grpc::ClientReader< ::BlockStorage::Heartbeat>* BlockStorageService::Stub::rpc_heartbeatListenerRaw(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request) {
+  return ::grpc::internal::ClientReaderFactory< ::BlockStorage::Heartbeat>::Create(channel_.get(), rpcmethod_rpc_heartbeatListener_, context, request);
+}
+
+void BlockStorageService::Stub::async::rpc_heartbeatListener(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat* request, ::grpc::ClientReadReactor< ::BlockStorage::Heartbeat>* reactor) {
+  ::grpc::internal::ClientCallbackReaderFactory< ::BlockStorage::Heartbeat>::Create(stub_->channel_.get(), stub_->rpcmethod_rpc_heartbeatListener_, context, request, reactor);
+}
+
+::grpc::ClientAsyncReader< ::BlockStorage::Heartbeat>* BlockStorageService::Stub::Asyncrpc_heartbeatListenerRaw(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request, ::grpc::CompletionQueue* cq, void* tag) {
+  return ::grpc::internal::ClientAsyncReaderFactory< ::BlockStorage::Heartbeat>::Create(channel_.get(), cq, rpcmethod_rpc_heartbeatListener_, context, request, true, tag);
+}
+
+::grpc::ClientAsyncReader< ::BlockStorage::Heartbeat>* BlockStorageService::Stub::PrepareAsyncrpc_heartbeatListenerRaw(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncReaderFactory< ::BlockStorage::Heartbeat>::Create(channel_.get(), cq, rpcmethod_rpc_heartbeatListener_, context, request, false, nullptr);
+}
+
 BlockStorageService::Service::Service() {
   AddMethod(new ::grpc::internal::RpcServiceMethod(
       BlockStorageService_method_names[0],
@@ -104,6 +165,36 @@ BlockStorageService::Service::Service() {
              ::BlockStorage::WriteResult* resp) {
                return service->rpc_write(ctx, req, resp);
              }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      BlockStorageService_method_names[2],
+      ::grpc::internal::RpcMethod::SERVER_STREAMING,
+      new ::grpc::internal::ServerStreamingHandler< BlockStorageService::Service, ::BlockStorage::SubscribeForNotifications, ::BlockStorage::ClientCacheNotify>(
+          [](BlockStorageService::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::BlockStorage::SubscribeForNotifications* req,
+             ::grpc::ServerWriter<::BlockStorage::ClientCacheNotify>* writer) {
+               return service->rpc_subscribeForNotifications(ctx, req, writer);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      BlockStorageService_method_names[3],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< BlockStorageService::Service, ::BlockStorage::SubscribeForNotifications, ::BlockStorage::SubscribeForNotifications, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](BlockStorageService::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::BlockStorage::SubscribeForNotifications* req,
+             ::BlockStorage::SubscribeForNotifications* resp) {
+               return service->rpc_unSubscribeForNotifications(ctx, req, resp);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      BlockStorageService_method_names[4],
+      ::grpc::internal::RpcMethod::SERVER_STREAMING,
+      new ::grpc::internal::ServerStreamingHandler< BlockStorageService::Service, ::BlockStorage::Heartbeat, ::BlockStorage::Heartbeat>(
+          [](BlockStorageService::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::BlockStorage::Heartbeat* req,
+             ::grpc::ServerWriter<::BlockStorage::Heartbeat>* writer) {
+               return service->rpc_heartbeatListener(ctx, req, writer);
+             }, this)));
 }
 
 BlockStorageService::Service::~Service() {
@@ -120,6 +211,27 @@ BlockStorageService::Service::~Service() {
   (void) context;
   (void) request;
   (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status BlockStorageService::Service::rpc_subscribeForNotifications(::grpc::ServerContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::grpc::ServerWriter< ::BlockStorage::ClientCacheNotify>* writer) {
+  (void) context;
+  (void) request;
+  (void) writer;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status BlockStorageService::Service::rpc_unSubscribeForNotifications(::grpc::ServerContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::BlockStorage::SubscribeForNotifications* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status BlockStorageService::Service::rpc_heartbeatListener(::grpc::ServerContext* context, const ::BlockStorage::Heartbeat* request, ::grpc::ServerWriter< ::BlockStorage::Heartbeat>* writer) {
+  (void) context;
+  (void) request;
+  (void) writer;
   return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
 }
 

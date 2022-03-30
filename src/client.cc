@@ -2,9 +2,6 @@
 
 int run_application(bool isReadOnlyMode);
 
-bool checkIfOffsetIsAligned(uint32_t &offset) {
-    return offset % BLOCK_SIZE_BYTES == 0;
-}
 
 bool cacheStalenessValidation(const vector<uint32_t> &addressVector) {
     for (auto &address : addressVector) {
@@ -196,7 +193,7 @@ int main(int argc, char *argv[]) {
         addresses = {"localhost:50051", "localhost:50053"};
     }
 
-    generateClientIdentifier();
+    clientIdentifier = generateClientIdentifier();
 
     initServerInfo(addresses);
 

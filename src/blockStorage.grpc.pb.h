@@ -49,6 +49,31 @@ class BlockStorageService final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::BlockStorage::WriteResult>> PrepareAsyncrpc_write(::grpc::ClientContext* context, const ::BlockStorage::WriteRequest& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::BlockStorage::WriteResult>>(PrepareAsyncrpc_writeRaw(context, request, cq));
     }
+    std::unique_ptr< ::grpc::ClientReaderInterface< ::BlockStorage::ClientCacheNotify>> rpc_subscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request) {
+      return std::unique_ptr< ::grpc::ClientReaderInterface< ::BlockStorage::ClientCacheNotify>>(rpc_subscribeForNotificationsRaw(context, request));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncReaderInterface< ::BlockStorage::ClientCacheNotify>> Asyncrpc_subscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq, void* tag) {
+      return std::unique_ptr< ::grpc::ClientAsyncReaderInterface< ::BlockStorage::ClientCacheNotify>>(Asyncrpc_subscribeForNotificationsRaw(context, request, cq, tag));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncReaderInterface< ::BlockStorage::ClientCacheNotify>> PrepareAsyncrpc_subscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncReaderInterface< ::BlockStorage::ClientCacheNotify>>(PrepareAsyncrpc_subscribeForNotificationsRaw(context, request, cq));
+    }
+    virtual ::grpc::Status rpc_unSubscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::BlockStorage::SubscribeForNotifications* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::BlockStorage::SubscribeForNotifications>> Asyncrpc_unSubscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::BlockStorage::SubscribeForNotifications>>(Asyncrpc_unSubscribeForNotificationsRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::BlockStorage::SubscribeForNotifications>> PrepareAsyncrpc_unSubscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::BlockStorage::SubscribeForNotifications>>(PrepareAsyncrpc_unSubscribeForNotificationsRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientReaderInterface< ::BlockStorage::Heartbeat>> rpc_heartbeatListener(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request) {
+      return std::unique_ptr< ::grpc::ClientReaderInterface< ::BlockStorage::Heartbeat>>(rpc_heartbeatListenerRaw(context, request));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncReaderInterface< ::BlockStorage::Heartbeat>> Asyncrpc_heartbeatListener(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request, ::grpc::CompletionQueue* cq, void* tag) {
+      return std::unique_ptr< ::grpc::ClientAsyncReaderInterface< ::BlockStorage::Heartbeat>>(Asyncrpc_heartbeatListenerRaw(context, request, cq, tag));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncReaderInterface< ::BlockStorage::Heartbeat>> PrepareAsyncrpc_heartbeatListener(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncReaderInterface< ::BlockStorage::Heartbeat>>(PrepareAsyncrpc_heartbeatListenerRaw(context, request, cq));
+    }
     class async_interface {
      public:
       virtual ~async_interface() {}
@@ -56,6 +81,10 @@ class BlockStorageService final {
       virtual void rpc_read(::grpc::ClientContext* context, const ::BlockStorage::ReadRequest* request, ::BlockStorage::ReadResult* response, ::grpc::ClientUnaryReactor* reactor) = 0;
       virtual void rpc_write(::grpc::ClientContext* context, const ::BlockStorage::WriteRequest* request, ::BlockStorage::WriteResult* response, std::function<void(::grpc::Status)>) = 0;
       virtual void rpc_write(::grpc::ClientContext* context, const ::BlockStorage::WriteRequest* request, ::BlockStorage::WriteResult* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void rpc_subscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::grpc::ClientReadReactor< ::BlockStorage::ClientCacheNotify>* reactor) = 0;
+      virtual void rpc_unSubscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::BlockStorage::SubscribeForNotifications* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void rpc_unSubscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::BlockStorage::SubscribeForNotifications* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void rpc_heartbeatListener(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat* request, ::grpc::ClientReadReactor< ::BlockStorage::Heartbeat>* reactor) = 0;
     };
     typedef class async_interface experimental_async_interface;
     virtual class async_interface* async() { return nullptr; }
@@ -65,6 +94,14 @@ class BlockStorageService final {
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::BlockStorage::ReadResult>* PrepareAsyncrpc_readRaw(::grpc::ClientContext* context, const ::BlockStorage::ReadRequest& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::BlockStorage::WriteResult>* Asyncrpc_writeRaw(::grpc::ClientContext* context, const ::BlockStorage::WriteRequest& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::BlockStorage::WriteResult>* PrepareAsyncrpc_writeRaw(::grpc::ClientContext* context, const ::BlockStorage::WriteRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientReaderInterface< ::BlockStorage::ClientCacheNotify>* rpc_subscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request) = 0;
+    virtual ::grpc::ClientAsyncReaderInterface< ::BlockStorage::ClientCacheNotify>* Asyncrpc_subscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq, void* tag) = 0;
+    virtual ::grpc::ClientAsyncReaderInterface< ::BlockStorage::ClientCacheNotify>* PrepareAsyncrpc_subscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::BlockStorage::SubscribeForNotifications>* Asyncrpc_unSubscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::BlockStorage::SubscribeForNotifications>* PrepareAsyncrpc_unSubscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientReaderInterface< ::BlockStorage::Heartbeat>* rpc_heartbeatListenerRaw(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request) = 0;
+    virtual ::grpc::ClientAsyncReaderInterface< ::BlockStorage::Heartbeat>* Asyncrpc_heartbeatListenerRaw(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request, ::grpc::CompletionQueue* cq, void* tag) = 0;
+    virtual ::grpc::ClientAsyncReaderInterface< ::BlockStorage::Heartbeat>* PrepareAsyncrpc_heartbeatListenerRaw(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request, ::grpc::CompletionQueue* cq) = 0;
   };
   class Stub final : public StubInterface {
    public:
@@ -83,6 +120,31 @@ class BlockStorageService final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::BlockStorage::WriteResult>> PrepareAsyncrpc_write(::grpc::ClientContext* context, const ::BlockStorage::WriteRequest& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::BlockStorage::WriteResult>>(PrepareAsyncrpc_writeRaw(context, request, cq));
     }
+    std::unique_ptr< ::grpc::ClientReader< ::BlockStorage::ClientCacheNotify>> rpc_subscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request) {
+      return std::unique_ptr< ::grpc::ClientReader< ::BlockStorage::ClientCacheNotify>>(rpc_subscribeForNotificationsRaw(context, request));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncReader< ::BlockStorage::ClientCacheNotify>> Asyncrpc_subscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq, void* tag) {
+      return std::unique_ptr< ::grpc::ClientAsyncReader< ::BlockStorage::ClientCacheNotify>>(Asyncrpc_subscribeForNotificationsRaw(context, request, cq, tag));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncReader< ::BlockStorage::ClientCacheNotify>> PrepareAsyncrpc_subscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncReader< ::BlockStorage::ClientCacheNotify>>(PrepareAsyncrpc_subscribeForNotificationsRaw(context, request, cq));
+    }
+    ::grpc::Status rpc_unSubscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::BlockStorage::SubscribeForNotifications* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::BlockStorage::SubscribeForNotifications>> Asyncrpc_unSubscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::BlockStorage::SubscribeForNotifications>>(Asyncrpc_unSubscribeForNotificationsRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::BlockStorage::SubscribeForNotifications>> PrepareAsyncrpc_unSubscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::BlockStorage::SubscribeForNotifications>>(PrepareAsyncrpc_unSubscribeForNotificationsRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientReader< ::BlockStorage::Heartbeat>> rpc_heartbeatListener(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request) {
+      return std::unique_ptr< ::grpc::ClientReader< ::BlockStorage::Heartbeat>>(rpc_heartbeatListenerRaw(context, request));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncReader< ::BlockStorage::Heartbeat>> Asyncrpc_heartbeatListener(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request, ::grpc::CompletionQueue* cq, void* tag) {
+      return std::unique_ptr< ::grpc::ClientAsyncReader< ::BlockStorage::Heartbeat>>(Asyncrpc_heartbeatListenerRaw(context, request, cq, tag));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncReader< ::BlockStorage::Heartbeat>> PrepareAsyncrpc_heartbeatListener(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncReader< ::BlockStorage::Heartbeat>>(PrepareAsyncrpc_heartbeatListenerRaw(context, request, cq));
+    }
     class async final :
       public StubInterface::async_interface {
      public:
@@ -90,6 +152,10 @@ class BlockStorageService final {
       void rpc_read(::grpc::ClientContext* context, const ::BlockStorage::ReadRequest* request, ::BlockStorage::ReadResult* response, ::grpc::ClientUnaryReactor* reactor) override;
       void rpc_write(::grpc::ClientContext* context, const ::BlockStorage::WriteRequest* request, ::BlockStorage::WriteResult* response, std::function<void(::grpc::Status)>) override;
       void rpc_write(::grpc::ClientContext* context, const ::BlockStorage::WriteRequest* request, ::BlockStorage::WriteResult* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void rpc_subscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::grpc::ClientReadReactor< ::BlockStorage::ClientCacheNotify>* reactor) override;
+      void rpc_unSubscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::BlockStorage::SubscribeForNotifications* response, std::function<void(::grpc::Status)>) override;
+      void rpc_unSubscribeForNotifications(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::BlockStorage::SubscribeForNotifications* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void rpc_heartbeatListener(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat* request, ::grpc::ClientReadReactor< ::BlockStorage::Heartbeat>* reactor) override;
      private:
       friend class Stub;
       explicit async(Stub* stub): stub_(stub) { }
@@ -105,8 +171,19 @@ class BlockStorageService final {
     ::grpc::ClientAsyncResponseReader< ::BlockStorage::ReadResult>* PrepareAsyncrpc_readRaw(::grpc::ClientContext* context, const ::BlockStorage::ReadRequest& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::BlockStorage::WriteResult>* Asyncrpc_writeRaw(::grpc::ClientContext* context, const ::BlockStorage::WriteRequest& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::BlockStorage::WriteResult>* PrepareAsyncrpc_writeRaw(::grpc::ClientContext* context, const ::BlockStorage::WriteRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientReader< ::BlockStorage::ClientCacheNotify>* rpc_subscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request) override;
+    ::grpc::ClientAsyncReader< ::BlockStorage::ClientCacheNotify>* Asyncrpc_subscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq, void* tag) override;
+    ::grpc::ClientAsyncReader< ::BlockStorage::ClientCacheNotify>* PrepareAsyncrpc_subscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::BlockStorage::SubscribeForNotifications>* Asyncrpc_unSubscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::BlockStorage::SubscribeForNotifications>* PrepareAsyncrpc_unSubscribeForNotificationsRaw(::grpc::ClientContext* context, const ::BlockStorage::SubscribeForNotifications& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientReader< ::BlockStorage::Heartbeat>* rpc_heartbeatListenerRaw(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request) override;
+    ::grpc::ClientAsyncReader< ::BlockStorage::Heartbeat>* Asyncrpc_heartbeatListenerRaw(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request, ::grpc::CompletionQueue* cq, void* tag) override;
+    ::grpc::ClientAsyncReader< ::BlockStorage::Heartbeat>* PrepareAsyncrpc_heartbeatListenerRaw(::grpc::ClientContext* context, const ::BlockStorage::Heartbeat& request, ::grpc::CompletionQueue* cq) override;
     const ::grpc::internal::RpcMethod rpcmethod_rpc_read_;
     const ::grpc::internal::RpcMethod rpcmethod_rpc_write_;
+    const ::grpc::internal::RpcMethod rpcmethod_rpc_subscribeForNotifications_;
+    const ::grpc::internal::RpcMethod rpcmethod_rpc_unSubscribeForNotifications_;
+    const ::grpc::internal::RpcMethod rpcmethod_rpc_heartbeatListener_;
   };
   static std::unique_ptr<Stub> NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options = ::grpc::StubOptions());
 
@@ -116,6 +193,9 @@ class BlockStorageService final {
     virtual ~Service();
     virtual ::grpc::Status rpc_read(::grpc::ServerContext* context, const ::BlockStorage::ReadRequest* request, ::BlockStorage::ReadResult* response);
     virtual ::grpc::Status rpc_write(::grpc::ServerContext* context, const ::BlockStorage::WriteRequest* request, ::BlockStorage::WriteResult* response);
+    virtual ::grpc::Status rpc_subscribeForNotifications(::grpc::ServerContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::grpc::ServerWriter< ::BlockStorage::ClientCacheNotify>* writer);
+    virtual ::grpc::Status rpc_unSubscribeForNotifications(::grpc::ServerContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::BlockStorage::SubscribeForNotifications* response);
+    virtual ::grpc::Status rpc_heartbeatListener(::grpc::ServerContext* context, const ::BlockStorage::Heartbeat* request, ::grpc::ServerWriter< ::BlockStorage::Heartbeat>* writer);
   };
   template <class BaseClass>
   class WithAsyncMethod_rpc_read : public BaseClass {
@@ -157,7 +237,67 @@ class BlockStorageService final {
       ::grpc::Service::RequestAsyncUnary(1, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
-  typedef WithAsyncMethod_rpc_read<WithAsyncMethod_rpc_write<Service > > AsyncService;
+  template <class BaseClass>
+  class WithAsyncMethod_rpc_subscribeForNotifications : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_rpc_subscribeForNotifications() {
+      ::grpc::Service::MarkMethodAsync(2);
+    }
+    ~WithAsyncMethod_rpc_subscribeForNotifications() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_subscribeForNotifications(::grpc::ServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/, ::grpc::ServerWriter< ::BlockStorage::ClientCacheNotify>* /*writer*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void Requestrpc_subscribeForNotifications(::grpc::ServerContext* context, ::BlockStorage::SubscribeForNotifications* request, ::grpc::ServerAsyncWriter< ::BlockStorage::ClientCacheNotify>* writer, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncServerStreaming(2, context, request, writer, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_rpc_unSubscribeForNotifications : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_rpc_unSubscribeForNotifications() {
+      ::grpc::Service::MarkMethodAsync(3);
+    }
+    ~WithAsyncMethod_rpc_unSubscribeForNotifications() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_unSubscribeForNotifications(::grpc::ServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/, ::BlockStorage::SubscribeForNotifications* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void Requestrpc_unSubscribeForNotifications(::grpc::ServerContext* context, ::BlockStorage::SubscribeForNotifications* request, ::grpc::ServerAsyncResponseWriter< ::BlockStorage::SubscribeForNotifications>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(3, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_rpc_heartbeatListener : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_rpc_heartbeatListener() {
+      ::grpc::Service::MarkMethodAsync(4);
+    }
+    ~WithAsyncMethod_rpc_heartbeatListener() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_heartbeatListener(::grpc::ServerContext* /*context*/, const ::BlockStorage::Heartbeat* /*request*/, ::grpc::ServerWriter< ::BlockStorage::Heartbeat>* /*writer*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void Requestrpc_heartbeatListener(::grpc::ServerContext* context, ::BlockStorage::Heartbeat* request, ::grpc::ServerAsyncWriter< ::BlockStorage::Heartbeat>* writer, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncServerStreaming(4, context, request, writer, new_call_cq, notification_cq, tag);
+    }
+  };
+  typedef WithAsyncMethod_rpc_read<WithAsyncMethod_rpc_write<WithAsyncMethod_rpc_subscribeForNotifications<WithAsyncMethod_rpc_unSubscribeForNotifications<WithAsyncMethod_rpc_heartbeatListener<Service > > > > > AsyncService;
   template <class BaseClass>
   class WithCallbackMethod_rpc_read : public BaseClass {
    private:
@@ -212,7 +352,78 @@ class BlockStorageService final {
     virtual ::grpc::ServerUnaryReactor* rpc_write(
       ::grpc::CallbackServerContext* /*context*/, const ::BlockStorage::WriteRequest* /*request*/, ::BlockStorage::WriteResult* /*response*/)  { return nullptr; }
   };
-  typedef WithCallbackMethod_rpc_read<WithCallbackMethod_rpc_write<Service > > CallbackService;
+  template <class BaseClass>
+  class WithCallbackMethod_rpc_subscribeForNotifications : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_rpc_subscribeForNotifications() {
+      ::grpc::Service::MarkMethodCallback(2,
+          new ::grpc::internal::CallbackServerStreamingHandler< ::BlockStorage::SubscribeForNotifications, ::BlockStorage::ClientCacheNotify>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::BlockStorage::SubscribeForNotifications* request) { return this->rpc_subscribeForNotifications(context, request); }));
+    }
+    ~WithCallbackMethod_rpc_subscribeForNotifications() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_subscribeForNotifications(::grpc::ServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/, ::grpc::ServerWriter< ::BlockStorage::ClientCacheNotify>* /*writer*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerWriteReactor< ::BlockStorage::ClientCacheNotify>* rpc_subscribeForNotifications(
+      ::grpc::CallbackServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithCallbackMethod_rpc_unSubscribeForNotifications : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_rpc_unSubscribeForNotifications() {
+      ::grpc::Service::MarkMethodCallback(3,
+          new ::grpc::internal::CallbackUnaryHandler< ::BlockStorage::SubscribeForNotifications, ::BlockStorage::SubscribeForNotifications>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::BlockStorage::SubscribeForNotifications* request, ::BlockStorage::SubscribeForNotifications* response) { return this->rpc_unSubscribeForNotifications(context, request, response); }));}
+    void SetMessageAllocatorFor_rpc_unSubscribeForNotifications(
+        ::grpc::MessageAllocator< ::BlockStorage::SubscribeForNotifications, ::BlockStorage::SubscribeForNotifications>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(3);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::BlockStorage::SubscribeForNotifications, ::BlockStorage::SubscribeForNotifications>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_rpc_unSubscribeForNotifications() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_unSubscribeForNotifications(::grpc::ServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/, ::BlockStorage::SubscribeForNotifications* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* rpc_unSubscribeForNotifications(
+      ::grpc::CallbackServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/, ::BlockStorage::SubscribeForNotifications* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithCallbackMethod_rpc_heartbeatListener : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_rpc_heartbeatListener() {
+      ::grpc::Service::MarkMethodCallback(4,
+          new ::grpc::internal::CallbackServerStreamingHandler< ::BlockStorage::Heartbeat, ::BlockStorage::Heartbeat>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::BlockStorage::Heartbeat* request) { return this->rpc_heartbeatListener(context, request); }));
+    }
+    ~WithCallbackMethod_rpc_heartbeatListener() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_heartbeatListener(::grpc::ServerContext* /*context*/, const ::BlockStorage::Heartbeat* /*request*/, ::grpc::ServerWriter< ::BlockStorage::Heartbeat>* /*writer*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerWriteReactor< ::BlockStorage::Heartbeat>* rpc_heartbeatListener(
+      ::grpc::CallbackServerContext* /*context*/, const ::BlockStorage::Heartbeat* /*request*/)  { return nullptr; }
+  };
+  typedef WithCallbackMethod_rpc_read<WithCallbackMethod_rpc_write<WithCallbackMethod_rpc_subscribeForNotifications<WithCallbackMethod_rpc_unSubscribeForNotifications<WithCallbackMethod_rpc_heartbeatListener<Service > > > > > CallbackService;
   typedef CallbackService ExperimentalCallbackService;
   template <class BaseClass>
   class WithGenericMethod_rpc_read : public BaseClass {
@@ -244,6 +455,57 @@ class BlockStorageService final {
     }
     // disable synchronous version of this method
     ::grpc::Status rpc_write(::grpc::ServerContext* /*context*/, const ::BlockStorage::WriteRequest* /*request*/, ::BlockStorage::WriteResult* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_rpc_subscribeForNotifications : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_rpc_subscribeForNotifications() {
+      ::grpc::Service::MarkMethodGeneric(2);
+    }
+    ~WithGenericMethod_rpc_subscribeForNotifications() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_subscribeForNotifications(::grpc::ServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/, ::grpc::ServerWriter< ::BlockStorage::ClientCacheNotify>* /*writer*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_rpc_unSubscribeForNotifications : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_rpc_unSubscribeForNotifications() {
+      ::grpc::Service::MarkMethodGeneric(3);
+    }
+    ~WithGenericMethod_rpc_unSubscribeForNotifications() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_unSubscribeForNotifications(::grpc::ServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/, ::BlockStorage::SubscribeForNotifications* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_rpc_heartbeatListener : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_rpc_heartbeatListener() {
+      ::grpc::Service::MarkMethodGeneric(4);
+    }
+    ~WithGenericMethod_rpc_heartbeatListener() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_heartbeatListener(::grpc::ServerContext* /*context*/, const ::BlockStorage::Heartbeat* /*request*/, ::grpc::ServerWriter< ::BlockStorage::Heartbeat>* /*writer*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
@@ -289,6 +551,66 @@ class BlockStorageService final {
     }
   };
   template <class BaseClass>
+  class WithRawMethod_rpc_subscribeForNotifications : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_rpc_subscribeForNotifications() {
+      ::grpc::Service::MarkMethodRaw(2);
+    }
+    ~WithRawMethod_rpc_subscribeForNotifications() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_subscribeForNotifications(::grpc::ServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/, ::grpc::ServerWriter< ::BlockStorage::ClientCacheNotify>* /*writer*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void Requestrpc_subscribeForNotifications(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncWriter< ::grpc::ByteBuffer>* writer, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncServerStreaming(2, context, request, writer, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_rpc_unSubscribeForNotifications : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_rpc_unSubscribeForNotifications() {
+      ::grpc::Service::MarkMethodRaw(3);
+    }
+    ~WithRawMethod_rpc_unSubscribeForNotifications() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_unSubscribeForNotifications(::grpc::ServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/, ::BlockStorage::SubscribeForNotifications* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void Requestrpc_unSubscribeForNotifications(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(3, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_rpc_heartbeatListener : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_rpc_heartbeatListener() {
+      ::grpc::Service::MarkMethodRaw(4);
+    }
+    ~WithRawMethod_rpc_heartbeatListener() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_heartbeatListener(::grpc::ServerContext* /*context*/, const ::BlockStorage::Heartbeat* /*request*/, ::grpc::ServerWriter< ::BlockStorage::Heartbeat>* /*writer*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void Requestrpc_heartbeatListener(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncWriter< ::grpc::ByteBuffer>* writer, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncServerStreaming(4, context, request, writer, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
   class WithRawCallbackMethod_rpc_read : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
@@ -331,6 +653,72 @@ class BlockStorageService final {
     }
     virtual ::grpc::ServerUnaryReactor* rpc_write(
       ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_rpc_subscribeForNotifications : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_rpc_subscribeForNotifications() {
+      ::grpc::Service::MarkMethodRawCallback(2,
+          new ::grpc::internal::CallbackServerStreamingHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const::grpc::ByteBuffer* request) { return this->rpc_subscribeForNotifications(context, request); }));
+    }
+    ~WithRawCallbackMethod_rpc_subscribeForNotifications() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_subscribeForNotifications(::grpc::ServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/, ::grpc::ServerWriter< ::BlockStorage::ClientCacheNotify>* /*writer*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerWriteReactor< ::grpc::ByteBuffer>* rpc_subscribeForNotifications(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_rpc_unSubscribeForNotifications : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_rpc_unSubscribeForNotifications() {
+      ::grpc::Service::MarkMethodRawCallback(3,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->rpc_unSubscribeForNotifications(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_rpc_unSubscribeForNotifications() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_unSubscribeForNotifications(::grpc::ServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/, ::BlockStorage::SubscribeForNotifications* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* rpc_unSubscribeForNotifications(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_rpc_heartbeatListener : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_rpc_heartbeatListener() {
+      ::grpc::Service::MarkMethodRawCallback(4,
+          new ::grpc::internal::CallbackServerStreamingHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const::grpc::ByteBuffer* request) { return this->rpc_heartbeatListener(context, request); }));
+    }
+    ~WithRawCallbackMethod_rpc_heartbeatListener() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status rpc_heartbeatListener(::grpc::ServerContext* /*context*/, const ::BlockStorage::Heartbeat* /*request*/, ::grpc::ServerWriter< ::BlockStorage::Heartbeat>* /*writer*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerWriteReactor< ::grpc::ByteBuffer>* rpc_heartbeatListener(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/)  { return nullptr; }
   };
   template <class BaseClass>
   class WithStreamedUnaryMethod_rpc_read : public BaseClass {
@@ -386,9 +774,90 @@ class BlockStorageService final {
     // replace default version of method with streamed unary
     virtual ::grpc::Status Streamedrpc_write(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::BlockStorage::WriteRequest,::BlockStorage::WriteResult>* server_unary_streamer) = 0;
   };
-  typedef WithStreamedUnaryMethod_rpc_read<WithStreamedUnaryMethod_rpc_write<Service > > StreamedUnaryService;
-  typedef Service SplitStreamedService;
-  typedef WithStreamedUnaryMethod_rpc_read<WithStreamedUnaryMethod_rpc_write<Service > > StreamedService;
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_rpc_unSubscribeForNotifications : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_rpc_unSubscribeForNotifications() {
+      ::grpc::Service::MarkMethodStreamed(3,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::BlockStorage::SubscribeForNotifications, ::BlockStorage::SubscribeForNotifications>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::BlockStorage::SubscribeForNotifications, ::BlockStorage::SubscribeForNotifications>* streamer) {
+                       return this->Streamedrpc_unSubscribeForNotifications(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_rpc_unSubscribeForNotifications() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status rpc_unSubscribeForNotifications(::grpc::ServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/, ::BlockStorage::SubscribeForNotifications* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status Streamedrpc_unSubscribeForNotifications(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::BlockStorage::SubscribeForNotifications,::BlockStorage::SubscribeForNotifications>* server_unary_streamer) = 0;
+  };
+  typedef WithStreamedUnaryMethod_rpc_read<WithStreamedUnaryMethod_rpc_write<WithStreamedUnaryMethod_rpc_unSubscribeForNotifications<Service > > > StreamedUnaryService;
+  template <class BaseClass>
+  class WithSplitStreamingMethod_rpc_subscribeForNotifications : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithSplitStreamingMethod_rpc_subscribeForNotifications() {
+      ::grpc::Service::MarkMethodStreamed(2,
+        new ::grpc::internal::SplitServerStreamingHandler<
+          ::BlockStorage::SubscribeForNotifications, ::BlockStorage::ClientCacheNotify>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerSplitStreamer<
+                     ::BlockStorage::SubscribeForNotifications, ::BlockStorage::ClientCacheNotify>* streamer) {
+                       return this->Streamedrpc_subscribeForNotifications(context,
+                         streamer);
+                  }));
+    }
+    ~WithSplitStreamingMethod_rpc_subscribeForNotifications() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status rpc_subscribeForNotifications(::grpc::ServerContext* /*context*/, const ::BlockStorage::SubscribeForNotifications* /*request*/, ::grpc::ServerWriter< ::BlockStorage::ClientCacheNotify>* /*writer*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with split streamed
+    virtual ::grpc::Status Streamedrpc_subscribeForNotifications(::grpc::ServerContext* context, ::grpc::ServerSplitStreamer< ::BlockStorage::SubscribeForNotifications,::BlockStorage::ClientCacheNotify>* server_split_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithSplitStreamingMethod_rpc_heartbeatListener : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithSplitStreamingMethod_rpc_heartbeatListener() {
+      ::grpc::Service::MarkMethodStreamed(4,
+        new ::grpc::internal::SplitServerStreamingHandler<
+          ::BlockStorage::Heartbeat, ::BlockStorage::Heartbeat>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerSplitStreamer<
+                     ::BlockStorage::Heartbeat, ::BlockStorage::Heartbeat>* streamer) {
+                       return this->Streamedrpc_heartbeatListener(context,
+                         streamer);
+                  }));
+    }
+    ~WithSplitStreamingMethod_rpc_heartbeatListener() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status rpc_heartbeatListener(::grpc::ServerContext* /*context*/, const ::BlockStorage::Heartbeat* /*request*/, ::grpc::ServerWriter< ::BlockStorage::Heartbeat>* /*writer*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with split streamed
+    virtual ::grpc::Status Streamedrpc_heartbeatListener(::grpc::ServerContext* context, ::grpc::ServerSplitStreamer< ::BlockStorage::Heartbeat,::BlockStorage::Heartbeat>* server_split_streamer) = 0;
+  };
+  typedef WithSplitStreamingMethod_rpc_subscribeForNotifications<WithSplitStreamingMethod_rpc_heartbeatListener<Service > > SplitStreamedService;
+  typedef WithStreamedUnaryMethod_rpc_read<WithStreamedUnaryMethod_rpc_write<WithSplitStreamingMethod_rpc_subscribeForNotifications<WithStreamedUnaryMethod_rpc_unSubscribeForNotifications<WithSplitStreamingMethod_rpc_heartbeatListener<Service > > > > > StreamedService;
 };
 
 }  // namespace BlockStorage

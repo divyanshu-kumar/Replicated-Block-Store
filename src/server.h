@@ -1,26 +1,5 @@
-#include <arpa/inet.h>
-#include <dirent.h>
-#include <fcntl.h>
-#include <grpc++/grpc++.h>
-#include <signal.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <time.h>
-#include <unistd.h>
-#include <chrono>
-#include <ctime>
-#include <iostream>
-#include <memory>
-#include <mutex>
-#include <sstream>
-#include <string>
-#include <thread>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
-
+#include "utils.h"
+#include "fs_utils.h"
 #include "blockStorage.grpc.pb.h"
 
 using grpc::Channel;
@@ -38,21 +17,9 @@ using grpc::Status;
 using grpc::StatusCode;
 using namespace BlockStorage;
 using namespace std;
-
-enum DebugLevel { LevelInfo = 0, LevelError = 1, LevelNone = 2 };
-const DebugLevel debugMode = LevelError;
-
-const int one_kb = 1024;
-const int one_mb = 1024 * one_kb;
-const int one_gb = 1024 * one_mb;
-const int MAX_SIZE_BYTES = one_gb / 10;
-const int BLOCK_SIZE_BYTES = 4 * one_kb;
 const int MAX_NUM_RETRIES = 3;
 const int INITIAL_BACKOFF_MS = 10;
 const int MULTIPLIER = 1;
-const int numBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
-int backReadStalenessLimit = 10;
-
 string currentWorkDir, dataDirPath, writeTxLogsDirPath;
 
 static string role, other_address, my_address;
@@ -64,23 +31,9 @@ thread heartbeatThread;
 bool heartbeatShouldRun;
 bool isBackupAvailable;
 
-void    get_time(struct timespec* ts);
-double  get_time_diff(struct timespec* before, struct timespec* after);
-string  getCurrentWorkingDir();
-void    makeFolderAndBlocks();
-void    makeBlocks(int block_id_start, int block_id_end);
-void    createOneBlock(int block_id, const string &dataDirPath);
 void    rollbackUncommittedWrites();
-int     copyFile(const char *to, const char *from);
 int     logWriteTransaction(int address);
 int     unLogWriteTransaction(int address);
-int     localWrite(const WriteRequest* wr);
-string  parseArgument(const string & argumentString, const string & option);
-bool    isRoleValid();
-bool    isIPValid(const string & address);
-int     localRead(const int address, char * buf);
-int     msleep(long msec);
-bool    checkIfOffsetIsAligned(unsigned int offset);
 void    backupBlockRead(int address, bool isReadAligned);
 struct timespec* max_time(struct timespec *t1, struct timespec *t2);
 
@@ -340,7 +293,7 @@ class ServerReplication final : public BlockStorageService::Service {
             res = logWriteTransaction(wr->address() + 1);
         }
 
-        int bytes_written_local = localWrite(wr);
+        int bytes_written_local = localWrite(wr->address(), wr->offset(), wr->buffer(), dataDirPath);
 
         if (currentRole == "backup") {
             struct timespec currentTime;
@@ -501,7 +454,7 @@ int BackupOutOfSync::sync() {
         }
         const int four_kb = 4 * one_kb;
         char buf[four_kb + 1];
-        res = localRead(blockIdx, buf);
+        res = localRead(blockIdx, buf, dataDirPath);
         if (res == -1) {
             return -1;
         }
@@ -564,131 +517,6 @@ int unLogWriteTransaction(int address) {
     return res;
 }
 
-int localWrite(const WriteRequest* wr) {
-    bool isWriteAligned = checkIfOffsetIsAligned(wr->offset());
-    string blockAddress = dataDirPath + "/" + to_string(wr->address());
-
-    int fd = open(blockAddress.c_str(), O_WRONLY);
-    if (fd == -1) {
-        return fd;
-    }
-
-    int startIdx = isWriteAligned ? 0 : (wr->offset() % BLOCK_SIZE_BYTES);
-    int res = pwrite(
-        fd, wr->buffer().substr(0, (BLOCK_SIZE_BYTES - startIdx)).c_str(),
-        BLOCK_SIZE_BYTES - startIdx, startIdx);
-    fsync(fd);
-    close(fd);
-
-    if (!isWriteAligned) {
-        blockAddress = dataDirPath + "/" + to_string(wr->address() + 1);
-
-        fd = open(blockAddress.c_str(), O_WRONLY);
-        if (fd == -1) {
-            return fd;
-        }
-
-        res = pwrite(fd,
-                     wr->buffer().substr((BLOCK_SIZE_BYTES - startIdx)).c_str(),
-                     startIdx, 0);
-        fsync(fd);
-        close(fd);
-    }
-    return BLOCK_SIZE_BYTES;
-}
-
-int makeFolder(const string& folderPath) {
-    struct stat buffer;
-
-    if (stat(folderPath.c_str(), &buffer) == 0) {
-        if (debugMode <= DebugLevel::LevelInfo) {
-            printf("%s\t : Folder %s exists.\n", __func__, folderPath.c_str());
-        }
-    } else {
-        int res = mkdir(folderPath.c_str(), 0777);
-        if (res == 0) {
-            printf("%s\t : Folder %s created successfully!\n", __func__,
-                   folderPath.c_str());
-        } else {
-            printf("%s\t : Failed to create folder %s!\n", __func__,
-                   folderPath.c_str());
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
-void makeFolderAndBlocks() {
-    currentWorkDir = getCurrentWorkingDir();
-
-    if (debugMode <= DebugLevel::LevelInfo) {
-        printf(
-            "%s\t : Current Working Dir found as %s \n Trying to"
-            " make blocks in ./data/ folder.\n",
-            __func__, currentWorkDir.c_str());
-    }
-
-    dataDirPath = currentWorkDir + "/data";
-    writeTxLogsDirPath = currentWorkDir + "/writeTxLogs";
-
-    int res = makeFolder(dataDirPath);
-    if (res == -1) {
-        return;
-    }
-    res = makeFolder(writeTxLogsDirPath);
-    if (res == -1) {
-        return;
-    }
-
-    int num_workers = 8;
-    std::vector<std::thread> workers;
-
-    int totalBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
-
-    for (int t_id = 0; t_id < num_workers; t_id++) {
-        int block_id_start = (totalBlocks / num_workers) * t_id;
-        int block_id_end = block_id_start + (totalBlocks / num_workers) - 1;
-        if (t_id + 1 == num_workers) {
-            block_id_end = totalBlocks - 1;
-        }
-        workers.push_back(
-            std::thread(makeBlocks, block_id_start, block_id_end));
-    }
-
-    for (auto& th : workers) {
-        th.join();
-    }
-}
-
-void makeBlocks(int block_id_start, int block_id_end) {
-    for (int numBlock = block_id_start; numBlock <= block_id_end; numBlock++) {
-        createOneBlock(numBlock, dataDirPath);
-    }
-}
-
-void createOneBlock(int block_id, const string& dataDirPath) {
-    const string blockPath = dataDirPath + "/" + to_string(block_id);
-    struct stat buffer;
-
-    if (stat(blockPath.c_str(), &buffer) == 0) {
-        return;  // block already exists
-    }
-
-    static const string init_block_data = string(4 * one_kb, '0');
-    static const char* data = init_block_data.c_str();
-
-    FILE* fp = fopen(blockPath.c_str(), "a");
-    if (fp < 0) {
-        if (debugMode <= DebugLevel::LevelError) {
-            printf("%s\t : Error creating block %d\n", __func__, block_id);
-        }
-    }
-
-    fputs(data, fp);
-    fclose(fp);
-}
-
 void rollbackUncommittedWrites() {
     DIR* dir = opendir(writeTxLogsDirPath.c_str());
     if (dir == NULL) {
@@ -715,149 +543,6 @@ void rollbackUncommittedWrites() {
     closedir(dir);
 }
 
-string getCurrentWorkingDir() {
-    char arg1[20];
-    char exepath[PATH_MAX + 1] = {0};
-
-    sprintf(arg1, "/proc/%d/exe", getpid());
-
-    int res = readlink(arg1, exepath, 1024);
-    std::string s_path(exepath);
-    std::size_t lastPos = s_path.find_last_of("/");
-    return s_path.substr(0, lastPos);
-}
-
-int copyFile(const char* to, const char* from) {
-    int fd_to, fd_from;
-    char buf[4096];
-    ssize_t nread;
-    int saved_errno;
-
-    fd_from = open(from, O_RDONLY);
-    if (fd_from < 0) return -1;
-
-    fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL, 0666);
-    if (fd_to < 0) goto out_error;
-
-    while (nread = read(fd_from, buf, sizeof buf), nread > 0) {
-        char* out_ptr = buf;
-        ssize_t nwritten;
-
-        do {
-            nwritten = write(fd_to, out_ptr, nread);
-
-            if (nwritten >= 0) {
-                nread -= nwritten;
-                out_ptr += nwritten;
-            } else if (errno != EINTR) {
-                goto out_error;
-            }
-        } while (nread > 0);
-    }
-
-    if (nread == 0) {
-        if (close(fd_to) < 0) {
-            fd_to = -1;
-            goto out_error;
-        }
-        close(fd_from);
-
-        /* Success! */
-        return 0;
-    }
-
-out_error:
-    saved_errno = errno;
-
-    close(fd_from);
-    if (fd_to >= 0) close(fd_to);
-
-    errno = saved_errno;
-    return -1;
-}
-
-string parseArgument(const string& argumentString, const string& option) {
-    string value;
-
-    size_t pos = argumentString.find(option);
-    if (pos != string::npos) {
-        pos += option.length();
-        size_t endPos = argumentString.find(' ', pos);
-        value = argumentString.substr(pos, endPos - pos);
-    }
-
-    return value;
-}
-
-bool isRoleValid() { return role == "primary" || role == "backup"; }
-
-bool isIPValid(const string& address) {
-    size_t ipEndPos = address.find(":");
-    string ipAddress = address.substr(0, ipEndPos);
-    struct sockaddr_in sa;
-    int result = inet_pton(AF_INET, ipAddress.c_str(), &(sa.sin_addr));
-    if (result == 0) {
-        return false;
-    }
-    string portAddress = address.substr(ipEndPos + 1);
-    int port = stoi(portAddress);
-    return (port > 0 && port <= 65535);
-}
-
-inline void get_time(struct timespec* ts) {
-    clock_gettime(CLOCK_MONOTONIC, ts);
-}
-
-inline double get_time_diff(struct timespec* before, struct timespec* after) {
-    double delta_s = after->tv_sec - before->tv_sec;
-    double delta_ns = after->tv_nsec - before->tv_nsec;
-
-    return (delta_s + (delta_ns * 1e-9)) * ((double)1e3);
-}
-
-int localRead(const int address, char* buf) {
-    string blockAddress = dataDirPath + "/" + to_string(address);
-    int fd = open(blockAddress.c_str(), O_RDONLY);
-
-    if (fd == -1) {
-        printf("%s \n", __func__);
-        perror(strerror(errno));
-        return -1;
-    }
-
-    int res = pread(fd, buf, one_kb * 4, 0);
-    if (res == -1) {
-        printf("%s\t : ", __func__);
-        perror(strerror(errno));
-        return -1;
-    }
-
-    close(fd);
-
-    return 0;
-}
-
-int msleep(long msec) {
-    struct timespec ts;
-    int res;
-    if (msec < 0) {
-        errno = EINVAL;
-        return -1;
-    }
-
-    ts.tv_sec = msec / 1000;
-    ts.tv_nsec = (msec % 1000) * 1000000;
-
-    do {
-        res = nanosleep(&ts, &ts);
-    } while (res && errno == EINTR);
-
-    return res;
-}
-
-bool checkIfOffsetIsAligned(unsigned int offset) {
-    return offset % BLOCK_SIZE_BYTES == 0;
-}
 
 void runHeartbeat() {
     if (debugMode <= DebugLevel::LevelError) {
@@ -877,14 +562,6 @@ void runHeartbeat() {
         }
         msleep(500);
     }
-}
-
-struct timespec* max_time(struct timespec* t1, struct timespec* t2) {
-    int diff = get_time_diff(t1, t2);
-    if (diff >= 0) {
-        return t1;
-    }
-    return t2;
 }
 
 void backupBlockRead(int address, bool isReadAligned) {

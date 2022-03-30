@@ -46,7 +46,7 @@ struct TableStruct_blockStorage_2eproto {
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::PROTOBUF_NAMESPACE_ID::internal::AuxiliaryParseTableField aux[]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
-  static const ::PROTOBUF_NAMESPACE_ID::internal::ParseTable schema[5]
+  static const ::PROTOBUF_NAMESPACE_ID::internal::ParseTable schema[8]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::PROTOBUF_NAMESPACE_ID::internal::FieldMetadata field_metadata[];
   static const ::PROTOBUF_NAMESPACE_ID::internal::SerializationTable serialization_table[];
@@ -54,6 +54,12 @@ struct TableStruct_blockStorage_2eproto {
 };
 extern const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_blockStorage_2eproto;
 namespace BlockStorage {
+class ClientCacheNotify;
+struct ClientCacheNotifyDefaultTypeInternal;
+extern ClientCacheNotifyDefaultTypeInternal _ClientCacheNotify_default_instance_;
+class Heartbeat;
+struct HeartbeatDefaultTypeInternal;
+extern HeartbeatDefaultTypeInternal _Heartbeat_default_instance_;
 class ReadRequest;
 struct ReadRequestDefaultTypeInternal;
 extern ReadRequestDefaultTypeInternal _ReadRequest_default_instance_;
@@ -63,6 +69,9 @@ extern ReadResultDefaultTypeInternal _ReadResult_default_instance_;
 class SerializeByte;
 struct SerializeByteDefaultTypeInternal;
 extern SerializeByteDefaultTypeInternal _SerializeByte_default_instance_;
+class SubscribeForNotifications;
+struct SubscribeForNotificationsDefaultTypeInternal;
+extern SubscribeForNotificationsDefaultTypeInternal _SubscribeForNotifications_default_instance_;
 class WriteRequest;
 struct WriteRequestDefaultTypeInternal;
 extern WriteRequestDefaultTypeInternal _WriteRequest_default_instance_;
@@ -71,9 +80,12 @@ struct WriteResultDefaultTypeInternal;
 extern WriteResultDefaultTypeInternal _WriteResult_default_instance_;
 }  // namespace BlockStorage
 PROTOBUF_NAMESPACE_OPEN
+template<> ::BlockStorage::ClientCacheNotify* Arena::CreateMaybeMessage<::BlockStorage::ClientCacheNotify>(Arena*);
+template<> ::BlockStorage::Heartbeat* Arena::CreateMaybeMessage<::BlockStorage::Heartbeat>(Arena*);
 template<> ::BlockStorage::ReadRequest* Arena::CreateMaybeMessage<::BlockStorage::ReadRequest>(Arena*);
 template<> ::BlockStorage::ReadResult* Arena::CreateMaybeMessage<::BlockStorage::ReadResult>(Arena*);
 template<> ::BlockStorage::SerializeByte* Arena::CreateMaybeMessage<::BlockStorage::SerializeByte>(Arena*);
+template<> ::BlockStorage::SubscribeForNotifications* Arena::CreateMaybeMessage<::BlockStorage::SubscribeForNotifications>(Arena*);
 template<> ::BlockStorage::WriteRequest* Arena::CreateMaybeMessage<::BlockStorage::WriteRequest>(Arena*);
 template<> ::BlockStorage::WriteResult* Arena::CreateMaybeMessage<::BlockStorage::WriteResult>(Arena*);
 PROTOBUF_NAMESPACE_CLOSE
@@ -518,10 +530,26 @@ class ReadRequest final :
   // accessors -------------------------------------------------------
 
   enum : int {
+    kIdentifierFieldNumber = 5,
     kAddressFieldNumber = 1,
     kSizeFieldNumber = 2,
     kOffsetFieldNumber = 3,
+    kRequirecacheFieldNumber = 4,
   };
+  // string identifier = 5;
+  void clear_identifier();
+  const std::string& identifier() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_identifier(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_identifier();
+  PROTOBUF_MUST_USE_RESULT std::string* release_identifier();
+  void set_allocated_identifier(std::string* identifier);
+  private:
+  const std::string& _internal_identifier() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_identifier(const std::string& value);
+  std::string* _internal_mutable_identifier();
+  public:
+
   // uint32 address = 1;
   void clear_address();
   ::PROTOBUF_NAMESPACE_ID::uint32 address() const;
@@ -549,6 +577,15 @@ class ReadRequest final :
   void _internal_set_offset(::PROTOBUF_NAMESPACE_ID::uint32 value);
   public:
 
+  // bool requirecache = 4;
+  void clear_requirecache();
+  bool requirecache() const;
+  void set_requirecache(bool value);
+  private:
+  bool _internal_requirecache() const;
+  void _internal_set_requirecache(bool value);
+  public:
+
   // @@protoc_insertion_point(class_scope:BlockStorage.ReadRequest)
  private:
   class _Internal;
@@ -556,9 +593,11 @@ class ReadRequest final :
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr identifier_;
   ::PROTOBUF_NAMESPACE_ID::uint32 address_;
   ::PROTOBUF_NAMESPACE_ID::uint32 size_;
   ::PROTOBUF_NAMESPACE_ID::uint32 offset_;
+  bool requirecache_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_blockStorage_2eproto;
 };
@@ -684,6 +723,7 @@ class WriteRequest final :
 
   enum : int {
     kBufferFieldNumber = 2,
+    kIdentifierFieldNumber = 5,
     kAddressFieldNumber = 1,
     kSizeFieldNumber = 3,
     kOffsetFieldNumber = 4,
@@ -700,6 +740,20 @@ class WriteRequest final :
   const std::string& _internal_buffer() const;
   inline PROTOBUF_ALWAYS_INLINE void _internal_set_buffer(const std::string& value);
   std::string* _internal_mutable_buffer();
+  public:
+
+  // string identifier = 5;
+  void clear_identifier();
+  const std::string& identifier() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_identifier(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_identifier();
+  PROTOBUF_MUST_USE_RESULT std::string* release_identifier();
+  void set_allocated_identifier(std::string* identifier);
+  private:
+  const std::string& _internal_identifier() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_identifier(const std::string& value);
+  std::string* _internal_mutable_identifier();
   public:
 
   // uint32 address = 1;
@@ -737,6 +791,7 @@ class WriteRequest final :
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr buffer_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr identifier_;
   ::PROTOBUF_NAMESPACE_ID::uint32 address_;
   ::PROTOBUF_NAMESPACE_ID::uint32 size_;
   ::PROTOBUF_NAMESPACE_ID::uint32 offset_;
@@ -894,6 +949,445 @@ class WriteResult final :
   typedef void DestructorSkippable_;
   ::PROTOBUF_NAMESPACE_ID::int32 nbytes_;
   ::PROTOBUF_NAMESPACE_ID::int32 err_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_blockStorage_2eproto;
+};
+// -------------------------------------------------------------------
+
+class ClientCacheNotify final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:BlockStorage.ClientCacheNotify) */ {
+ public:
+  inline ClientCacheNotify() : ClientCacheNotify(nullptr) {}
+  ~ClientCacheNotify() override;
+  explicit constexpr ClientCacheNotify(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  ClientCacheNotify(const ClientCacheNotify& from);
+  ClientCacheNotify(ClientCacheNotify&& from) noexcept
+    : ClientCacheNotify() {
+    *this = ::std::move(from);
+  }
+
+  inline ClientCacheNotify& operator=(const ClientCacheNotify& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ClientCacheNotify& operator=(ClientCacheNotify&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const ClientCacheNotify& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const ClientCacheNotify* internal_default_instance() {
+    return reinterpret_cast<const ClientCacheNotify*>(
+               &_ClientCacheNotify_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    5;
+
+  friend void swap(ClientCacheNotify& a, ClientCacheNotify& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(ClientCacheNotify* other) {
+    if (other == this) return;
+    if (GetOwningArena() == other->GetOwningArena()) {
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ClientCacheNotify* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  inline ClientCacheNotify* New() const final {
+    return new ClientCacheNotify();
+  }
+
+  ClientCacheNotify* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<ClientCacheNotify>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const ClientCacheNotify& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom(const ClientCacheNotify& from);
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  ::PROTOBUF_NAMESPACE_ID::uint8* _InternalSerialize(
+      ::PROTOBUF_NAMESPACE_ID::uint8* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(ClientCacheNotify* other);
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "BlockStorage.ClientCacheNotify";
+  }
+  protected:
+  explicit ClientCacheNotify(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  static void ArenaDtor(void* object);
+  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kAddressFieldNumber = 1,
+  };
+  // int32 address = 1;
+  void clear_address();
+  ::PROTOBUF_NAMESPACE_ID::int32 address() const;
+  void set_address(::PROTOBUF_NAMESPACE_ID::int32 value);
+  private:
+  ::PROTOBUF_NAMESPACE_ID::int32 _internal_address() const;
+  void _internal_set_address(::PROTOBUF_NAMESPACE_ID::int32 value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:BlockStorage.ClientCacheNotify)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::int32 address_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_blockStorage_2eproto;
+};
+// -------------------------------------------------------------------
+
+class SubscribeForNotifications final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:BlockStorage.SubscribeForNotifications) */ {
+ public:
+  inline SubscribeForNotifications() : SubscribeForNotifications(nullptr) {}
+  ~SubscribeForNotifications() override;
+  explicit constexpr SubscribeForNotifications(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  SubscribeForNotifications(const SubscribeForNotifications& from);
+  SubscribeForNotifications(SubscribeForNotifications&& from) noexcept
+    : SubscribeForNotifications() {
+    *this = ::std::move(from);
+  }
+
+  inline SubscribeForNotifications& operator=(const SubscribeForNotifications& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline SubscribeForNotifications& operator=(SubscribeForNotifications&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const SubscribeForNotifications& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const SubscribeForNotifications* internal_default_instance() {
+    return reinterpret_cast<const SubscribeForNotifications*>(
+               &_SubscribeForNotifications_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    6;
+
+  friend void swap(SubscribeForNotifications& a, SubscribeForNotifications& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(SubscribeForNotifications* other) {
+    if (other == this) return;
+    if (GetOwningArena() == other->GetOwningArena()) {
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(SubscribeForNotifications* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  inline SubscribeForNotifications* New() const final {
+    return new SubscribeForNotifications();
+  }
+
+  SubscribeForNotifications* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<SubscribeForNotifications>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const SubscribeForNotifications& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom(const SubscribeForNotifications& from);
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  ::PROTOBUF_NAMESPACE_ID::uint8* _InternalSerialize(
+      ::PROTOBUF_NAMESPACE_ID::uint8* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(SubscribeForNotifications* other);
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "BlockStorage.SubscribeForNotifications";
+  }
+  protected:
+  explicit SubscribeForNotifications(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  static void ArenaDtor(void* object);
+  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kIdentifierFieldNumber = 1,
+  };
+  // string identifier = 1;
+  void clear_identifier();
+  const std::string& identifier() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_identifier(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_identifier();
+  PROTOBUF_MUST_USE_RESULT std::string* release_identifier();
+  void set_allocated_identifier(std::string* identifier);
+  private:
+  const std::string& _internal_identifier() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_identifier(const std::string& value);
+  std::string* _internal_mutable_identifier();
+  public:
+
+  // @@protoc_insertion_point(class_scope:BlockStorage.SubscribeForNotifications)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr identifier_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_blockStorage_2eproto;
+};
+// -------------------------------------------------------------------
+
+class Heartbeat final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:BlockStorage.Heartbeat) */ {
+ public:
+  inline Heartbeat() : Heartbeat(nullptr) {}
+  ~Heartbeat() override;
+  explicit constexpr Heartbeat(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  Heartbeat(const Heartbeat& from);
+  Heartbeat(Heartbeat&& from) noexcept
+    : Heartbeat() {
+    *this = ::std::move(from);
+  }
+
+  inline Heartbeat& operator=(const Heartbeat& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline Heartbeat& operator=(Heartbeat&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const Heartbeat& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const Heartbeat* internal_default_instance() {
+    return reinterpret_cast<const Heartbeat*>(
+               &_Heartbeat_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    7;
+
+  friend void swap(Heartbeat& a, Heartbeat& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(Heartbeat* other) {
+    if (other == this) return;
+    if (GetOwningArena() == other->GetOwningArena()) {
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(Heartbeat* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  inline Heartbeat* New() const final {
+    return new Heartbeat();
+  }
+
+  Heartbeat* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<Heartbeat>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const Heartbeat& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom(const Heartbeat& from);
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  ::PROTOBUF_NAMESPACE_ID::uint8* _InternalSerialize(
+      ::PROTOBUF_NAMESPACE_ID::uint8* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(Heartbeat* other);
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "BlockStorage.Heartbeat";
+  }
+  protected:
+  explicit Heartbeat(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  static void ArenaDtor(void* object);
+  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kMsgFieldNumber = 1,
+  };
+  // string msg = 1;
+  void clear_msg();
+  const std::string& msg() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_msg(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_msg();
+  PROTOBUF_MUST_USE_RESULT std::string* release_msg();
+  void set_allocated_msg(std::string* msg);
+  private:
+  const std::string& _internal_msg() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_msg(const std::string& value);
+  std::string* _internal_mutable_msg();
+  public:
+
+  // @@protoc_insertion_point(class_scope:BlockStorage.Heartbeat)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr msg_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_blockStorage_2eproto;
 };
@@ -1108,6 +1602,72 @@ inline void ReadRequest::set_offset(::PROTOBUF_NAMESPACE_ID::uint32 value) {
   // @@protoc_insertion_point(field_set:BlockStorage.ReadRequest.offset)
 }
 
+// bool requirecache = 4;
+inline void ReadRequest::clear_requirecache() {
+  requirecache_ = false;
+}
+inline bool ReadRequest::_internal_requirecache() const {
+  return requirecache_;
+}
+inline bool ReadRequest::requirecache() const {
+  // @@protoc_insertion_point(field_get:BlockStorage.ReadRequest.requirecache)
+  return _internal_requirecache();
+}
+inline void ReadRequest::_internal_set_requirecache(bool value) {
+  
+  requirecache_ = value;
+}
+inline void ReadRequest::set_requirecache(bool value) {
+  _internal_set_requirecache(value);
+  // @@protoc_insertion_point(field_set:BlockStorage.ReadRequest.requirecache)
+}
+
+// string identifier = 5;
+inline void ReadRequest::clear_identifier() {
+  identifier_.ClearToEmpty();
+}
+inline const std::string& ReadRequest::identifier() const {
+  // @@protoc_insertion_point(field_get:BlockStorage.ReadRequest.identifier)
+  return _internal_identifier();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void ReadRequest::set_identifier(ArgT0&& arg0, ArgT... args) {
+ 
+ identifier_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:BlockStorage.ReadRequest.identifier)
+}
+inline std::string* ReadRequest::mutable_identifier() {
+  std::string* _s = _internal_mutable_identifier();
+  // @@protoc_insertion_point(field_mutable:BlockStorage.ReadRequest.identifier)
+  return _s;
+}
+inline const std::string& ReadRequest::_internal_identifier() const {
+  return identifier_.Get();
+}
+inline void ReadRequest::_internal_set_identifier(const std::string& value) {
+  
+  identifier_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* ReadRequest::_internal_mutable_identifier() {
+  
+  return identifier_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* ReadRequest::release_identifier() {
+  // @@protoc_insertion_point(field_release:BlockStorage.ReadRequest.identifier)
+  return identifier_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void ReadRequest::set_allocated_identifier(std::string* identifier) {
+  if (identifier != nullptr) {
+    
+  } else {
+    
+  }
+  identifier_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), identifier,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:BlockStorage.ReadRequest.identifier)
+}
+
 // -------------------------------------------------------------------
 
 // WriteRequest
@@ -1218,6 +1778,52 @@ inline void WriteRequest::set_offset(::PROTOBUF_NAMESPACE_ID::uint32 value) {
   // @@protoc_insertion_point(field_set:BlockStorage.WriteRequest.offset)
 }
 
+// string identifier = 5;
+inline void WriteRequest::clear_identifier() {
+  identifier_.ClearToEmpty();
+}
+inline const std::string& WriteRequest::identifier() const {
+  // @@protoc_insertion_point(field_get:BlockStorage.WriteRequest.identifier)
+  return _internal_identifier();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void WriteRequest::set_identifier(ArgT0&& arg0, ArgT... args) {
+ 
+ identifier_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:BlockStorage.WriteRequest.identifier)
+}
+inline std::string* WriteRequest::mutable_identifier() {
+  std::string* _s = _internal_mutable_identifier();
+  // @@protoc_insertion_point(field_mutable:BlockStorage.WriteRequest.identifier)
+  return _s;
+}
+inline const std::string& WriteRequest::_internal_identifier() const {
+  return identifier_.Get();
+}
+inline void WriteRequest::_internal_set_identifier(const std::string& value) {
+  
+  identifier_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* WriteRequest::_internal_mutable_identifier() {
+  
+  return identifier_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* WriteRequest::release_identifier() {
+  // @@protoc_insertion_point(field_release:BlockStorage.WriteRequest.identifier)
+  return identifier_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void WriteRequest::set_allocated_identifier(std::string* identifier) {
+  if (identifier != nullptr) {
+    
+  } else {
+    
+  }
+  identifier_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), identifier,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:BlockStorage.WriteRequest.identifier)
+}
+
 // -------------------------------------------------------------------
 
 // WriteResult
@@ -1262,9 +1868,139 @@ inline void WriteResult::set_err(::PROTOBUF_NAMESPACE_ID::int32 value) {
   // @@protoc_insertion_point(field_set:BlockStorage.WriteResult.err)
 }
 
+// -------------------------------------------------------------------
+
+// ClientCacheNotify
+
+// int32 address = 1;
+inline void ClientCacheNotify::clear_address() {
+  address_ = 0;
+}
+inline ::PROTOBUF_NAMESPACE_ID::int32 ClientCacheNotify::_internal_address() const {
+  return address_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::int32 ClientCacheNotify::address() const {
+  // @@protoc_insertion_point(field_get:BlockStorage.ClientCacheNotify.address)
+  return _internal_address();
+}
+inline void ClientCacheNotify::_internal_set_address(::PROTOBUF_NAMESPACE_ID::int32 value) {
+  
+  address_ = value;
+}
+inline void ClientCacheNotify::set_address(::PROTOBUF_NAMESPACE_ID::int32 value) {
+  _internal_set_address(value);
+  // @@protoc_insertion_point(field_set:BlockStorage.ClientCacheNotify.address)
+}
+
+// -------------------------------------------------------------------
+
+// SubscribeForNotifications
+
+// string identifier = 1;
+inline void SubscribeForNotifications::clear_identifier() {
+  identifier_.ClearToEmpty();
+}
+inline const std::string& SubscribeForNotifications::identifier() const {
+  // @@protoc_insertion_point(field_get:BlockStorage.SubscribeForNotifications.identifier)
+  return _internal_identifier();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void SubscribeForNotifications::set_identifier(ArgT0&& arg0, ArgT... args) {
+ 
+ identifier_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:BlockStorage.SubscribeForNotifications.identifier)
+}
+inline std::string* SubscribeForNotifications::mutable_identifier() {
+  std::string* _s = _internal_mutable_identifier();
+  // @@protoc_insertion_point(field_mutable:BlockStorage.SubscribeForNotifications.identifier)
+  return _s;
+}
+inline const std::string& SubscribeForNotifications::_internal_identifier() const {
+  return identifier_.Get();
+}
+inline void SubscribeForNotifications::_internal_set_identifier(const std::string& value) {
+  
+  identifier_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* SubscribeForNotifications::_internal_mutable_identifier() {
+  
+  return identifier_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* SubscribeForNotifications::release_identifier() {
+  // @@protoc_insertion_point(field_release:BlockStorage.SubscribeForNotifications.identifier)
+  return identifier_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void SubscribeForNotifications::set_allocated_identifier(std::string* identifier) {
+  if (identifier != nullptr) {
+    
+  } else {
+    
+  }
+  identifier_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), identifier,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:BlockStorage.SubscribeForNotifications.identifier)
+}
+
+// -------------------------------------------------------------------
+
+// Heartbeat
+
+// string msg = 1;
+inline void Heartbeat::clear_msg() {
+  msg_.ClearToEmpty();
+}
+inline const std::string& Heartbeat::msg() const {
+  // @@protoc_insertion_point(field_get:BlockStorage.Heartbeat.msg)
+  return _internal_msg();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void Heartbeat::set_msg(ArgT0&& arg0, ArgT... args) {
+ 
+ msg_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:BlockStorage.Heartbeat.msg)
+}
+inline std::string* Heartbeat::mutable_msg() {
+  std::string* _s = _internal_mutable_msg();
+  // @@protoc_insertion_point(field_mutable:BlockStorage.Heartbeat.msg)
+  return _s;
+}
+inline const std::string& Heartbeat::_internal_msg() const {
+  return msg_.Get();
+}
+inline void Heartbeat::_internal_set_msg(const std::string& value) {
+  
+  msg_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* Heartbeat::_internal_mutable_msg() {
+  
+  return msg_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* Heartbeat::release_msg() {
+  // @@protoc_insertion_point(field_release:BlockStorage.Heartbeat.msg)
+  return msg_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void Heartbeat::set_allocated_msg(std::string* msg) {
+  if (msg != nullptr) {
+    
+  } else {
+    
+  }
+  msg_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), msg,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:BlockStorage.Heartbeat.msg)
+}
+
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------

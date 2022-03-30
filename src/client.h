@@ -1,26 +1,4 @@
-#include <arpa/inet.h>
-#include <assert.h>
-#include <dirent.h>
-#include <errno.h>
-#include <grpc++/grpc++.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <time.h>
-#include <unistd.h>
-
-#include <chrono>
-#include <condition_variable>
-#include <iostream>
-#include <mutex>
-#include <numeric>
-#include <random>
-#include <thread>
-#include <vector>
-
+#include "utils.h"
 #include "blockStorage.grpc.pb.h"
 
 using grpc::Channel;
@@ -32,41 +10,17 @@ using grpc::Status;
 using namespace BlockStorage;
 using namespace std;
 
-enum DebugLevel { LevelInfo = 0, LevelError = 1, LevelNone = 2 };
-const DebugLevel debugMode = LevelError;
-
-const int one_kb = 1024;
-const int one_mb = 1024 * one_kb;
-const int one_gb = 1024 * one_mb;
-const int MAX_SIZE_BYTES = one_gb / 10;
-const int BLOCK_SIZE_BYTES = 4 * one_kb;
 const int MAX_NUM_RETRIES = 6;
 const int INITIAL_BACKOFF_MS = 50;
 const int MULTIPLIER = 2;
-const int numBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
-const int isCachingEnabled = true;
-const int stalenessLimit = 10 * 1e3;  // milli-seconds
-const int SERVER_OFFLINE_ERROR_CODE = -1011317;
 
 static string clientIdentifier;
-
 std::thread notificationThread;
 
 static int currentServerIdx = 0;
 
 int switchServerConnection();
 string getServerName(int index);
-
-inline void get_time(struct timespec *ts) {
-    clock_gettime(CLOCK_MONOTONIC, ts);
-}
-
-inline double get_time_diff(struct timespec *before, struct timespec *after) {
-    double delta_s = after->tv_sec - before->tv_sec;
-    double delta_ns = after->tv_nsec - before->tv_nsec;
-
-    return (delta_s + (delta_ns * 1e-9)) * ((double)1e3);
-}
 
 struct CacheInfo {
     bool isCached;
@@ -296,52 +250,6 @@ struct ServerInfo {
 
 static vector<ServerInfo> serverInfos;
 
-int msleep(long msec) {
-    struct timespec ts;
-    int res;
-    if (msec < 0) {
-        errno = EINVAL;
-        return -1;
-    }
-
-    ts.tv_sec = msec / 1000;
-    ts.tv_nsec = (msec % 1000) * 1000000;
-
-    do {
-        res = nanosleep(&ts, &ts);
-    } while (res && errno == EINTR);
-
-    return res;
-}
-
-string parseArgument(const string &argumentString, const string &option) {
-    string value;
-
-    size_t pos = argumentString.find(option);
-    if (pos != string::npos) {
-        pos += option.length();
-        size_t endPos = argumentString.find(' ', pos);
-        value = argumentString.substr(pos, endPos - pos);
-    }
-
-    return value;
-}
-
-bool isIPValid(const string &address) {
-    size_t ipEndPos = address.find(":");
-    string ipAddress = address.substr(0, ipEndPos);
-    struct sockaddr_in sa;
-    int result = (ipAddress == "localhost")
-                     ? 1
-                     : inet_pton(AF_INET, ipAddress.c_str(), &(sa.sin_addr));
-    if (result == 0) {
-        return false;
-    }
-    string portAddress = address.substr(ipEndPos + 1);
-    int port = stoi(portAddress);
-    return (port > 0 && port <= 65535);
-}
-
 void cacheInvalidationListener() {
     cout << __func__ << "\t : Listening for notifications.." << endl;
     Status status = grpc::Status::OK;
@@ -385,27 +293,6 @@ void CacheInfo::cacheData(const string &data) {
     this->data = data;
     isCached = true;
     get_time(&lastRefreshTs);
-}
-
-void generateClientIdentifier() {
-    int identifierLength = 32;
-
-    const char alphanum[] =
-        "0123456789"
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz";
-    clientIdentifier.reserve(identifierLength);
-
-    std::random_device dev;
-    std::mt19937 rng(dev());
-    std::uniform_int_distribution<std::mt19937::result_type> dist6(
-        0, identifierLength - 1);  // distribution in range [1, 6]
-
-    for (int i = 0; i < identifierLength; ++i) {
-        clientIdentifier += alphanum[dist6(rng)];
-    }
-    cout << __func__ << "\t : Generated client identifier " << clientIdentifier
-         << endl;
 }
 
 int switchServerConnection() {
