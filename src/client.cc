@@ -147,6 +147,10 @@ static int client_write(uint32_t offset, const string &buf) {
 }
 
 int main(int argc, char *argv[]) {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    cout.tie(nullptr);
+
     srand(time(NULL));
 
     if (debugMode <= DebugLevel::LevelInfo) {
@@ -272,7 +276,7 @@ int run_application(bool isReadOnlyMode) {
 
         if ((!isReadOnlyMode) && (num_bytes_write != 4096) &&
             (debugMode <= DebugLevel::LevelError)) {
-            printf("Didn't write 4k bytes to this file!\n");
+            printf("Didn't write 4k bytes to this file! Instead wrote %d bytes.\n", num_bytes_write);
         }
 
         msleep((int)dist6(rng));

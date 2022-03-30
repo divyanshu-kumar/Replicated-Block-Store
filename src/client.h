@@ -42,7 +42,7 @@ const int MAX_SIZE_BYTES = one_gb / 10;
 const int BLOCK_SIZE_BYTES = 4 * one_kb;
 const int MAX_NUM_RETRIES = 6;
 const int INITIAL_BACKOFF_MS = 50;
-const int MULTIPLIER = 1;
+const int MULTIPLIER = 2;
 const int numBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
 const int isCachingEnabled = true;
 const int stalenessLimit = 10 * 1e3;  // milli-seconds
@@ -52,7 +52,10 @@ static string clientIdentifier;
 
 std::thread notificationThread;
 
+static int currentServerIdx = 0;
+
 int switchServerConnection();
+string getServerName(int index);
 
 inline void get_time(struct timespec *ts) {
     clock_gettime(CLOCK_MONOTONIC, ts);
@@ -126,8 +129,9 @@ class BlockStorageClient {
                          << endl;
                 }
                 if (debugMode <= DebugLevel::LevelError) {
-                    cout << __func__ << "\t : Retrying with timeout (ms) of "
-                         << currentBackoff << endl;
+                    cout << __func__ << "\t : Retrying to " 
+                         << getServerName(currentServerIdx) << " with timeout (ms) of "
+                         << currentBackoff << " MULTIPLIER = " << MULTIPLIER << endl;
                 }
             }
         }
@@ -193,7 +197,8 @@ class BlockStorageClient {
                          << endl;
                 }
                 if (debugMode <= DebugLevel::LevelError) {
-                    cout << __func__ << "\t : Retrying with timeout (ms) of "
+                    cout << __func__ << "\t : Retrying to " 
+                         << getServerName(currentServerIdx) << " with timeout (ms) of "
                          << currentBackoff << endl;
                 }
             }
@@ -290,7 +295,6 @@ struct ServerInfo {
 };
 
 static vector<ServerInfo> serverInfos;
-static int currentServerIdx = 0;
 
 int msleep(long msec) {
     struct timespec ts;
@@ -352,7 +356,7 @@ void cacheInvalidationListener() {
             currentServerIdx = (currentServerIdx + 1) % serverInfos.size();
             if (debugMode <= DebugLevel::LevelError) {
                 cout << __func__ << "\t : Changing to backup server "
-                     << serverInfos[currentServerIdx].address << endl;
+                     << getServerName(currentServerIdx) << endl;
             }
         }
     } while (grpc::StatusCode::UNAVAILABLE == status.error_code());
@@ -407,12 +411,21 @@ void generateClientIdentifier() {
 int switchServerConnection() {
     cout << __func__ << "\t : Primary server is offline!" << endl;
 
-    currentServerIdx = (currentServerIdx + 1) % serverInfos.size();
+    // Commenting out as this functionality is being handled by subscription
+    // service now. But discuss it with team - **TODO**.
+    //currentServerIdx = (currentServerIdx + 1) % serverInfos.size();
 
-    notificationThread.join();
-    notificationThread = (std::thread(cacheInvalidationListener));
+    //notificationThread.join();
+    //notificationThread = (std::thread(cacheInvalidationListener));
     msleep(1);
 
     cout << __func__ << "\t : Changing to server at "
-         << serverInfos[currentServerIdx].address << endl;
+         << getServerName(currentServerIdx) << endl;
+}
+
+string getServerName(int index) {
+    if (index < 0 || index > serverInfos.size()) {
+        return "";
+    }
+    return serverInfos[index].address;
 }

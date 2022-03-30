@@ -47,7 +47,7 @@ const int one_mb = 1024 * one_kb;
 const int one_gb = 1024 * one_mb;
 const int MAX_SIZE_BYTES = one_gb / 10;
 const int BLOCK_SIZE_BYTES = 4 * one_kb;
-const int MAX_NUM_RETRIES = 4;
+const int MAX_NUM_RETRIES = 3;
 const int INITIAL_BACKOFF_MS = 10;
 const int MULTIPLIER = 1;
 const int numBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
@@ -62,6 +62,7 @@ unordered_map<int, struct timespec> backupLastWriteTime;
 
 thread heartbeatThread;
 bool heartbeatShouldRun;
+bool isBackupAvailable;
 
 void    get_time(struct timespec* ts);
 double  get_time_diff(struct timespec* before, struct timespec* after);
@@ -81,7 +82,6 @@ int     localRead(const int address, char * buf);
 int     msleep(long msec);
 bool    checkIfOffsetIsAligned(unsigned int offset);
 void    backupBlockRead(int address, bool isReadAligned);
-
 struct timespec* max_time(struct timespec *t1, struct timespec *t2);
 
 struct BackupOutOfSync {
@@ -220,10 +220,9 @@ class ServerReplication final : public BlockStorageService::Service {
             if (status.error_code() != grpc::StatusCode::DEADLINE_EXCEEDED ||
                 numRetriesLeft-- == 0) {
                 if (numRetriesLeft <= 0) {
-                    printf(
-                        "%s \t : Server seems offline. Error Code = %d, "
-                        "numRetriesLeft = %d\n",
-                        __func__, status.error_code(), numRetriesLeft);
+                    if (debugMode <= DebugLevel::LevelError) {
+                        printf("%s \t : Backup server seems offline\n", __func__);
+                    }
                     return -1;
                 }
                 isDone = true;
@@ -318,7 +317,8 @@ class ServerReplication final : public BlockStorageService::Service {
         const string currentRole = role;
         if (debugMode <= DebugLevel::LevelInfo) {
             cout << __func__ << "\t : Address " << wr->address() << ", offset "
-                 << wr->offset() << ", role " << currentRole << endl;
+                 << wr->offset() << ", role " << currentRole 
+                 << ", isBackupAvailable = " << isBackupAvailable << endl;
         }
 
         bool isAlignedWrite = checkIfOffsetIsAligned(wr->offset());
@@ -367,10 +367,12 @@ class ServerReplication final : public BlockStorageService::Service {
                 if (!isAlignedWrite) {
                     backupSyncState.logOutOfSync(wr->address() + 1);
                 }
-                backupSyncState.sync();
+                if (isBackupAvailable) {
+                    backupSyncState.sync();
+                }
             } else {
-                int bytes_written_backup =
-                    this->rpc_write(wr->address(), wr->buffer(), wr->offset());
+                int bytes_written_backup = isBackupAvailable ? 
+                    this->rpc_write(wr->address(), wr->buffer(), wr->offset()) : 0;
                 if (bytes_written_local != bytes_written_backup) {
                     backupSyncState.logOutOfSync(wr->address());
                     if (!isAlignedWrite) {
@@ -452,10 +454,10 @@ class ServerReplication final : public BlockStorageService::Service {
 
         Status status = reader->Finish();
         if (!status.ok()) {
-            if (debugMode <= DebugLevel::LevelInfo) {
-                cout << __func__ << "\t : Status returned as "
-                     << status.error_message() << endl;
-            }
+            // if (debugMode <= DebugLevel::LevelInfo) {
+            //     cout << __func__ << "\t : Status returned as "
+            //          << status.error_message() << endl;
+            // }
         }
     }
 
@@ -862,8 +864,9 @@ void runHeartbeat() {
         cout << __func__ << "\t : Starting heartbeat service!" << endl;
     }
     while (heartbeatShouldRun) {
+        isBackupAvailable = true;
         serverReplication->rpc_heartbeatSender();
-        msleep(5);
+        isBackupAvailable = false;
         if (role == "backup") {
             if (debugMode <= DebugLevel::LevelError) {
                 cout << __func__
@@ -872,6 +875,7 @@ void runHeartbeat() {
             role = "primary";
             backupLastWriteTime.clear();
         }
+        msleep(500);
     }
 }
 

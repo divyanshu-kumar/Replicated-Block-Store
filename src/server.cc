@@ -60,6 +60,7 @@ int main(int argc, char** argv) {
 
     backupLastWriteTime.clear();
 
+    isBackupAvailable = true;
     heartbeatShouldRun = true;
     heartbeatThread = thread(runHeartbeat);
 
