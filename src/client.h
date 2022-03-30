@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <vector>
+#include <random>
 #include <arpa/inet.h>
 
 #include "blockStorage.grpc.pb.h"
@@ -36,7 +37,7 @@ const DebugLevel debugMode = LevelNone;
 const int one_kb = 1024;
 const int one_mb = 1024 * one_kb;
 const int one_gb = 1024 * one_mb;
-const int MAX_SIZE_BYTES = one_gb;
+const int MAX_SIZE_BYTES = one_gb / 10;
 const int BLOCK_SIZE_BYTES = 4 * one_kb;
 const int MAX_NUM_RETRIES = 6;
 const int INITIAL_BACKOFF_MS = 50;
@@ -49,6 +50,8 @@ const int SERVER_OFFLINE_ERROR_CODE = -1011317;
 static string clientIdentifier;
 
 std::thread notificationThread;
+
+int switchServerConnection();
 
 inline void get_time(struct timespec *ts) {
     clock_gettime(CLOCK_MONOTONIC, ts);
@@ -111,6 +114,7 @@ class BlockStorageClient {
             Status status = stub_->rpc_read(&clientContext, rr, &rres);
             error_code = status.error_code();
             currentBackoff *= MULTIPLIER;
+            cout<<__func__ << " "<< status.error_message() << " " << status.error_code() << endl; 
             if (status.error_code() != grpc::StatusCode::DEADLINE_EXCEEDED || numRetriesLeft-- == 0) {
                 isDone = true;
             }
@@ -118,8 +122,8 @@ class BlockStorageClient {
                 printf("%s \t : Timed out to contact server. Retrying...\n", __func__);
                 cout << __func__ << " : Error code = " << status.error_message() << endl;
             }
+            cout << __func__ << " : ~~~~Error code = " << status.error_message() << endl;
         }
-
         // case where server is not responding/offline
         if (error_code == grpc::StatusCode::DEADLINE_EXCEEDED){
             return SERVER_OFFLINE_ERROR_CODE;
@@ -181,7 +185,7 @@ class BlockStorageClient {
         }
     }
 
-    void rpc_subscribeForNotifications() {
+    Status rpc_subscribeForNotifications() {
         ClientContext context;
         ClientCacheNotify notifyMessage;
         SubscribeForNotifications subReq;
@@ -203,6 +207,7 @@ class BlockStorageClient {
         if (!status.ok()) {
             cout << __func__ << " Status returned as " << status.error_message() << endl;
         }
+        return status;
     }
 
     void rpc_unSubscribeForNotifications() {
@@ -264,6 +269,8 @@ string parseArgument(const string & argumentString, const string & option) {
         value = argumentString.substr(pos, endPos - pos);
     }
 
+    cout << __func__ << " : Parsed = " << value << endl;
+
     return value;
 }
 
@@ -282,7 +289,15 @@ bool isIPValid(const string & address) {
 
 void cacheInvalidationListener() {
     cout << __func__ << " : Listening for notifications.." << endl;
-    (serverInfos[currentServerIdx].connection)->rpc_subscribeForNotifications();
+    Status status = grpc::Status::OK;
+    do {
+        status = (serverInfos[currentServerIdx].connection)->rpc_subscribeForNotifications();
+        cout << __func__ << " : Error code = " << status.error_code() << " and message = " << status.error_message() << endl; 
+        if (status.error_code() == grpc::StatusCode::UNAVAILABLE) { 
+            currentServerIdx = (currentServerIdx+1)%serverInfos.size();
+            cout <<__func__ << " : Changing to backup server = " << currentServerIdx << endl;
+        }
+    } while (grpc::StatusCode::UNAVAILABLE == status.error_code());
     cout << __func__ << " : Stopped listening for notifications now." << endl;
 }
 
@@ -320,8 +335,26 @@ void generateClientIdentifier(){
                                 "abcdefghijklmnopqrstuvwxyz";
     clientIdentifier.reserve(identifierLength);
 
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0,identifierLength - 1); // distribution in range [1, 6]
+
     for (int i = 0; i < identifierLength; ++i) {
-        clientIdentifier += alphanum[rand() % (sizeof(alphanum) - 1)];
+        clientIdentifier += alphanum[dist6(rng)];
     }
     cout << "generated client identifier " << clientIdentifier << endl;
+}
+
+
+int switchServerConnection() {
+    cout << __func__ << " : Primary server is offline!" << endl;
+    
+    currentServerIdx = (currentServerIdx+1)%serverInfos.size();
+
+    notificationThread.join();
+    notificationThread = (std::thread(cacheInvalidationListener));
+    msleep(1);
+    
+    printf("%s \t: Changing to server at %s...\n", __func__,
+           serverInfos[currentServerIdx].address.c_str());
 }

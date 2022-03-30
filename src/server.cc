@@ -20,12 +20,10 @@ int main(int argc, char** argv) {
     string argumentString;
 
     if (argc > 1) {
-
         for (int arg = 1; arg < argc; arg++) {
             argumentString.append(argv[arg]);
             argumentString.push_back(' ');
         }
-
         role = parseArgument(argumentString, "--role=");
         my_address = parseArgument(argumentString, "--my_address=");
         other_address = parseArgument(argumentString, "--other_address=");
@@ -53,6 +51,8 @@ int main(int argc, char** argv) {
     makeFolderAndBlocks();
 
     rollbackUncommittedWrites();
+
+    backupLastWriteTime.clear();
 
     heartbeatShouldRun = true;
     heartbeatThread = thread(runHeartbeat);

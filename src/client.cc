@@ -1,19 +1,7 @@
 #include "client.h"
 
-int run_application();
+int run_application(bool isReadOnlyMode);
 
-int switchServerConnection() {
-    cout << __func__ << " : Primary server is offline!" << endl;
-    
-    currentServerIdx = (currentServerIdx+1)%serverInfos.size();
-    
-    notificationThread.join();
-    notificationThread = (std::thread(cacheInvalidationListener));
-    msleep(1);
-    
-    printf("%s \t: Changing to server at %s...\n", __func__,
-           serverInfos[currentServerIdx].address.c_str());
-}
 
 bool checkIfOffsetIsAligned(uint32_t &offset){
     return offset % BLOCK_SIZE_BYTES == 0;
@@ -27,7 +15,7 @@ bool cacheStalenessValidation(const vector<uint32_t> &addressVector){
     return true;
 }
 
-static int client_read(uint32_t offset, string & buf) {
+static int client_read(uint32_t offset, string & buf, bool readFromBackup = false) {
     // printf("%s : Address = %d\n", __func__, offset);
     int res = 0;
 
@@ -54,12 +42,18 @@ static int client_read(uint32_t offset, string & buf) {
             // cout << __func__ << "Cached data not found for file " << address << endl;
         }
     }
-    
-    res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf, readSize, offset);
 
+    int serverToContactIdx = readFromBackup ? (currentServerIdx + 1) % 2 : currentServerIdx;
+
+    res = (serverInfos[serverToContactIdx].connection)->rpc_read(address, buf, readSize, offset);
+    cout << __func__ << " res: " << res << " from server id "<<serverToContactIdx << endl;
     if (res == SERVER_OFFLINE_ERROR_CODE) {
-        switchServerConnection();
+        if (!readFromBackup) {
+            switchServerConnection();
+        }
+
         res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf, readSize, offset);
+        cout << __func__ << " res: " << res << " from server id "<<currentServerIdx << endl;
         if(res < 0){
             cout << __func__ << " : Both servers are offline!" << endl;
             return -1;
@@ -113,6 +107,7 @@ int main(int argc, char *argv[]) {
     bool isCrashSiteArgPassed = false;
     int crashSite = 0;
     string argumentString;
+    bool isReadOnlyMode = false;
 
     if (argc > 1) {
         for (int arg = 1; arg < argc; arg++) {
@@ -134,6 +129,9 @@ int main(int argc, char *argv[]) {
                 addresses.push_back(address);
             }
         } while (!address.empty());
+
+        isReadOnlyMode = !parseArgument(argumentString, "--readOnly=").empty();
+        cout << "Read Only = " << isReadOnlyMode << endl;
     }
 
     if (addresses.empty()) {
@@ -147,18 +145,22 @@ int main(int argc, char *argv[]) {
     printf("%s \t: Connecting to server at %s...\n", __func__,
            serverInfos[currentServerIdx].address.c_str());
 
-    return run_application();
+    return run_application(isReadOnlyMode);
 }
 
 
-int run_application() {
+int run_application(bool isReadOnlyMode) {
     vector<pair<double, int>> readTimes, writeTimes;
 
     string write_data = string(4096, 'x');
 
     int totalBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
 
-    const int NUM_RUNS = 8;
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0,50);
+
+    const int NUM_RUNS = 500;
     for (int i = 0; i < NUM_RUNS; i++) {
         string buf;
         uint32_t address = i % NUM_RUNS;//max(0, rand()) % totalBlocks;
@@ -166,7 +168,7 @@ int run_application() {
         struct timespec read_start, read_end;
         get_time(&read_start);
         
-        int num_bytes_read = client_read(address * BLOCK_SIZE_BYTES, buf);
+        int num_bytes_read = client_read(address * BLOCK_SIZE_BYTES, buf, isReadOnlyMode);
         
         get_time(&read_end);
         readTimes.push_back(make_pair(get_time_diff(&read_start, &read_end), address));
@@ -174,11 +176,13 @@ int run_application() {
         if (num_bytes_read != 4096) {
             printf("Didn't read 4k bytes from this file! Instead read %d bytes!\n", num_bytes_read);
         }
+        
+        msleep((int)dist6(rng));
 
         // Testing cache
         get_time(&read_start);
         
-        num_bytes_read = client_read(address * BLOCK_SIZE_BYTES, buf);
+        num_bytes_read = client_read(address * BLOCK_SIZE_BYTES, buf, isReadOnlyMode);
         
         get_time(&read_end);
         readTimes.push_back(make_pair(get_time_diff(&read_start, &read_end), address));
@@ -187,27 +191,26 @@ int run_application() {
             printf("Didn't read 4k bytes from this file! Instead read %d bytes!\n", num_bytes_read);
         }
 
-        // msleep(100 * max(0, rand() % ));
+        msleep((int)dist6(rng));
 
         address = i % NUM_RUNS;//max(0, rand()) % totalBlocks;
         
         struct timespec write_start, write_end;
         get_time(&write_start);
         
-        int num_bytes_write = client_write(address * BLOCK_SIZE_BYTES, write_data);
+        int num_bytes_write = 0;
+        
+        if (!isReadOnlyMode)
+            num_bytes_write = client_write(address * BLOCK_SIZE_BYTES, write_data);
         
         get_time(&write_end);
         writeTimes.push_back(make_pair(get_time_diff(&write_start, &write_end), address));
         
-        if (num_bytes_write != 4096) {
+        if (!isReadOnlyMode && num_bytes_write != 4096) {
             printf("Didn't write 4k bytes to this file!\n");
         }
         
-        msleep(max(0, rand() % 10));
-
-        if (i % 2 == 1) {
-            msleep(10000);
-        }
+        msleep((int)dist6(rng));
     }
 
     double meanReadTime = 0;
@@ -221,10 +224,10 @@ int run_application() {
         meanWriteTime += writeTime.first;
     }
     meanWriteTime /= writeTimes.size();
-    
+  
     sort(readTimes.begin(), readTimes.end());
     sort(writeTimes.begin(), writeTimes.end());
-    
+
     double medianReadTime = readTimes[readTimes.size() / 2].first;
     double medianWriteTime = writeTimes[writeTimes.size() / 2].first;
 

@@ -42,12 +42,13 @@ using namespace std;
 const int one_kb = 1024;
 const int one_mb = 1024 * one_kb;
 const int one_gb = 1024 * one_mb;
-const int MAX_SIZE_BYTES = one_gb;
+const int MAX_SIZE_BYTES = one_gb / 10;
 const int BLOCK_SIZE_BYTES = 4 * one_kb;
 const int MAX_NUM_RETRIES = 3;
 const int INITIAL_BACKOFF_MS = 10;
 const int MULTIPLIER = 1.5;
 const int numBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
+int backReadStalenessLimit = 10;
 
 string  currentWorkDir,
         dataDirPath,
@@ -58,6 +59,7 @@ static string   role,
                 my_address;
 
 static vector<std::mutex> blockLock(numBlocks);
+unordered_map<int, struct timespec> backupLastWriteTime; 
 
 thread heartbeatThread;
 bool heartbeatShouldRun;
@@ -79,6 +81,8 @@ bool    isIPValid(const string & address);
 int     localRead(const int address, char * buf);
 int     msleep(long msec);
 bool    checkIfOffsetIsAligned(unsigned int offset);
+struct timespec* max_time(struct timespec *t1, struct timespec *t2);
+void    backupBlockRead(int address, bool isReadAligned);
 
 struct BackupOutOfSync {
     bool isOutOfSync;
@@ -98,23 +102,23 @@ struct NotificationInfo {
     unordered_map<string, ServerWriter<ClientCacheNotify>*> clientWriters;
 
     void Subscribe(int address, const string &id) {
-        cout << __func__ << " for address " << address << " id " << id << endl;
+        cout << __func__ << " for address " << address << " id " << id << "with role " << role << endl;
         subscribedClients[address].insert(id);
     }
 
     void UnSubscribe(int address, const string &id) {
-        cout << __func__ << " for address " << address << " id " << id << endl;
+        cout << __func__ << " for address " << address << " id " << id << "with role " << role << endl;
         subscribedClients[address].erase(id);
     }
 
     void AddClient(const string &clientId, ServerWriter<ClientCacheNotify>* clientWriter) {
-        cout << __func__ << " Adding Client " << " id " << clientId << endl;
+        cout << __func__ << " Adding Client " << " id " << clientId << "with role " << role << endl;
         clientWriters[clientId] = clientWriter;
         subscriberShouldRun[clientId] = true;
     }
 
     void RemoveClient(const string &clientId) {
-        cout << __func__ << " Removing Client " << " id " << clientId << endl;
+        cout << __func__ << " Removing Client " << " id " << clientId  << "with role " << role << endl;
         clientWriters.erase(clientId);
         subscriberShouldRun[clientId] = false;
     }
@@ -140,7 +144,7 @@ struct NotificationInfo {
     }
 
     void NotifySingleClient(const string &id, const int &address){
-        cout << __func__ << " Notify Client for address " << address << " id " << id << endl;
+        cout << __func__ << " Notify Client for address " << address << " id " << id << "with role " << role << endl;
         try{
             ServerWriter<ClientCacheNotify>* writer = clientWriters[id];
             ClientCacheNotify notifyReply;
@@ -213,7 +217,17 @@ class ServerReplication final : public BlockStorageService::Service {
                         ReadResult* reply) override {
         printf("%s : Address = %u\n", __func__, rr->address());
         bool isReadAligned = checkIfOffsetIsAligned(rr->offset());
-        bool isCachingRequested = rr->requirecache();
+        if(role == "primary"){
+            cout << __func__ << "putting lock for address " << rr->address() << endl;
+            lock_guard<mutex> guard(blockLock[rr->address()]);
+            if(!isReadAligned)
+                lock_guard<mutex> guard(blockLock[rr->address()+1]);
+        } else {
+            cout << __func__ << "Blocking read for address " << rr->address() << endl;
+            backupBlockRead(rr->address(), isReadAligned);
+        }
+        cout<<"Lock/Block released " << endl;
+        bool isCachingRequested = rr->requirecache() && (role == "primary");
 
         if (isCachingRequested) {
             string clientId = rr->identifier();
@@ -277,6 +291,15 @@ class ServerReplication final : public BlockStorageService::Service {
             res  = logWriteTransaction(wr->address() + 1);
 
         int bytes_written_local = localWrite(wr);
+
+        if (role == "backup") {
+            struct timespec currentTime;
+            get_time(&currentTime);
+            backupLastWriteTime[wr->address()] = currentTime;
+            if (!isAlignedWrite) {
+                backupLastWriteTime[wr->address() + 1] = currentTime;
+            }
+        }
 
         if(bytes_written_local == -1){
             reply->set_err(errno);
@@ -754,8 +777,49 @@ void runHeartbeat() {
         // Do something here
         if (role == "backup") {
             role = "primary";
+            backupLastWriteTime.clear();
         }
     }
     //cout << __func__ << " : Heartbeat service stopped now! Other server is down" << endl;
     
+}
+
+struct timespec* max_time(struct timespec *t1, struct timespec *t2) {
+    int diff = get_time_diff(t1, t2);
+    if (diff >= 0) {
+        return t1;
+    }
+    return t2;
+}
+
+void backupBlockRead(int address, bool isReadAligned) {
+    bool shouldWait = false;
+    auto it1 = backupLastWriteTime.find(address);
+    auto it2 = it1;
+    if (!isReadAligned) {
+        it2 = backupLastWriteTime.find(address + 1);;
+    }
+    struct timespec lastWriteTime, *t1(nullptr), *t2(nullptr),
+        currentTime;
+    get_time(&currentTime);
+    if (it1 != backupLastWriteTime.end()) {
+        t1 = &it1->second;
+    }
+    if (it2 != backupLastWriteTime.end()) {
+        t2 = &it2->second;
+    }
+    if (t1) {
+        lastWriteTime = *t1;
+    }
+    if (t2) {
+        lastWriteTime = t1 ? *max_time(t1, t2) : *t2;
+    }
+    if (t1 == nullptr && t2 == nullptr) {
+        return;
+    }
+    if (get_time_diff(&lastWriteTime, &currentTime) < backReadStalenessLimit) {
+        int diff = backReadStalenessLimit - get_time_diff(&lastWriteTime, &currentTime);
+        cout<<" I will be sleeping now for " << diff << endl;
+        msleep(diff);
+    }
 }
