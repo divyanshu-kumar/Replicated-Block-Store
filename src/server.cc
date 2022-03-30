@@ -8,15 +8,19 @@ void RunServer() {
     builder.RegisterService(serverReplication);
 
     std::unique_ptr<Server> server(builder.BuildAndStart());
-    
+
     std::cout << "Server listening on " << my_address << std::endl;
 
     server->Wait();
 }
 
 int main(int argc, char** argv) {
-    srand(time(NULL));
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    cout.tie(nullptr);
     
+    srand(time(NULL));
+
     string argumentString;
 
     if (argc > 1) {
@@ -28,25 +32,27 @@ int main(int argc, char** argv) {
         my_address = parseArgument(argumentString, "--my_address=");
         other_address = parseArgument(argumentString, "--other_address=");
 
-        if (!isRoleValid() || !isIPValid(my_address) || !isIPValid(other_address)) {
-            cout << "Role = " << role << "\nMy Address = " << my_address << 
-            "\nOther Address = " << other_address << endl;
+        if (!isRoleValid() || !isIPValid(my_address) ||
+            !isIPValid(other_address)) {
+            cout << "Role = " << role << "\nMy Address = " << my_address
+                 << "\nOther Address = " << other_address << endl;
             role = "";
         }
     }
 
-     if (role.empty() || my_address.empty()) {
-        printf( "Enter arguments like below and try again - \n"
-                "./server --role=[primary or backup] "
-                "--my_address=[IP:PORT] --other_address=[IP:PORT]\n");
+    if (role.empty() || my_address.empty()) {
+        printf(
+            "Enter arguments like below and try again - \n"
+            "./server --role=[primary or backup] "
+            "--my_address=[IP:PORT] --other_address=[IP:PORT]\n");
         return 0;
     }
 
-    cout << "Role = " << role << "\nMy Address = " << my_address << 
-            "\nOther Address = " << other_address << endl;
+    cout << "Role = " << role << "\nMy Address = " << my_address
+         << "\nOther Address = " << other_address << endl;
 
-    serverReplication = new ServerReplication(grpc::CreateChannel(other_address.c_str(),
-                                                grpc::InsecureChannelCredentials()));
+    serverReplication = new ServerReplication(grpc::CreateChannel(
+        other_address.c_str(), grpc::InsecureChannelCredentials()));
 
     makeFolderAndBlocks();
 

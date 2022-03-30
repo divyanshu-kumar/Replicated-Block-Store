@@ -1,24 +1,25 @@
+#include <arpa/inet.h>
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
+#include <grpc++/grpc++.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+
 #include <chrono>
 #include <condition_variable>
 #include <iostream>
 #include <mutex>
-#include <thread>
 #include <numeric>
-#include <grpc++/grpc++.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <vector>
 #include <random>
-#include <arpa/inet.h>
+#include <thread>
+#include <vector>
 
 #include "blockStorage.grpc.pb.h"
 
@@ -32,7 +33,7 @@ using namespace BlockStorage;
 using namespace std;
 
 enum DebugLevel { LevelInfo = 0, LevelError = 1, LevelNone = 2 };
-const DebugLevel debugMode = LevelNone;
+const DebugLevel debugMode = LevelError;
 
 const int one_kb = 1024;
 const int one_mb = 1024 * one_kb;
@@ -41,10 +42,10 @@ const int MAX_SIZE_BYTES = one_gb / 10;
 const int BLOCK_SIZE_BYTES = 4 * one_kb;
 const int MAX_NUM_RETRIES = 6;
 const int INITIAL_BACKOFF_MS = 50;
-const int MULTIPLIER = 2;
+const int MULTIPLIER = 1;
 const int numBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
 const int isCachingEnabled = true;
-const int stalenessLimit = 10 * 1e3; // milli-seconds
+const int stalenessLimit = 10 * 1e3;  // milli-seconds
 const int SERVER_OFFLINE_ERROR_CODE = -1011317;
 
 static string clientIdentifier;
@@ -68,14 +69,10 @@ struct CacheInfo {
     bool isCached;
     string data;
     struct timespec lastRefreshTs;
-    CacheInfo() : isCached(false) {
-        get_time(&lastRefreshTs);
-    }
+    CacheInfo() : isCached(false) { get_time(&lastRefreshTs); }
     bool isStale();
-    void cacheData(const string & data);
-    void invalidateCache() {
-        isCached = false;
-    }
+    void cacheData(const string &data);
+    void invalidateCache() { isCached = false; }
 };
 
 vector<CacheInfo> cacheMap(numBlocks);
@@ -85,8 +82,11 @@ class BlockStorageClient {
     BlockStorageClient(std::shared_ptr<Channel> channel)
         : stub_(BlockStorageService::NewStub(channel)) {}
 
-    int rpc_read(uint32_t address, string & buf, uint32_t size, uint32_t offset) {
-        printf("%s : Address = %d\n", __func__, address);
+    int rpc_read(uint32_t address, string &buf, uint32_t size,
+                 uint32_t offset) {
+        if (debugMode <= DebugLevel::LevelInfo) {
+            printf("%s : Address = %d\n", __func__, address);
+        }
 
         ReadResult rres;
 
@@ -114,31 +114,48 @@ class BlockStorageClient {
             Status status = stub_->rpc_read(&clientContext, rr, &rres);
             error_code = status.error_code();
             currentBackoff *= MULTIPLIER;
-            cout<<__func__ << " "<< status.error_message() << " " << status.error_code() << endl; 
-            if (status.error_code() != grpc::StatusCode::DEADLINE_EXCEEDED || numRetriesLeft-- == 0) {
+
+            if (status.error_code() != grpc::StatusCode::DEADLINE_EXCEEDED ||
+                numRetriesLeft-- == 0) {
                 isDone = true;
+            } else {
+                if (debugMode <= DebugLevel::LevelInfo) {
+                    printf("%s \t : Timed out to contact server.\n", __func__);
+                    cout << __func__
+                         << "\t : Error code = " << status.error_message()
+                         << endl;
+                }
+                if (debugMode <= DebugLevel::LevelError) {
+                    cout << __func__ << "\t : Retrying with timeout (ms) of "
+                         << currentBackoff << endl;
+                }
             }
-            else {
-                printf("%s \t : Timed out to contact server. Retrying...\n", __func__);
-                cout << __func__ << " : Error code = " << status.error_message() << endl;
-            }
-            cout << __func__ << " : ~~~~Error code = " << status.error_message() << endl;
         }
+
         // case where server is not responding/offline
-        if (error_code == grpc::StatusCode::DEADLINE_EXCEEDED){
+        if (error_code == grpc::StatusCode::DEADLINE_EXCEEDED) {
+            if (debugMode <= DebugLevel::LevelError) {
+                cout << __func__ << "\t : Failed because of timeout!" << endl;
+            }
             return SERVER_OFFLINE_ERROR_CODE;
         }
-        
+
         if (rres.err() == 0) {
             buf = rres.buffer();
             return rres.bytesread();
         } else {
+            if (debugMode <= DebugLevel::LevelError) {
+                cout << __func__ << "\t : Failed with read error returned as "
+                     << rres.err() << endl;
+            }
             return -rres.err();
         }
     }
 
-    int rpc_write(uint32_t address, const string & buf, uint32_t offset) {
-        printf("%s : Address = %d\n", __func__, address);
+    int rpc_write(uint32_t address, const string &buf, uint32_t offset) {
+        if (debugMode <= DebugLevel::LevelInfo) {
+            printf("%s : Address = %d\n", __func__, address);
+        }
 
         WriteResult wres;
 
@@ -165,27 +182,45 @@ class BlockStorageClient {
             Status status = stub_->rpc_write(&ctx, wreq, &wres);
             error_code = status.error_code();
             currentBackoff *= MULTIPLIER;
-            if (status.error_code() != grpc::StatusCode::DEADLINE_EXCEEDED || numRetriesLeft-- == 0) {
+            if (status.error_code() != grpc::StatusCode::DEADLINE_EXCEEDED ||
+                numRetriesLeft-- == 0) {
                 isDone = true;
-            }
-            else {
-                printf("%s \t : Timed out to contact server. Retrying...\n", __func__);
-                cout << __func__ << " : Error code = " << status.error_message() << endl;
+            } else {
+                if (debugMode <= DebugLevel::LevelInfo) {
+                    printf("%s \t : Timed out to contact server.\n", __func__);
+                    cout << __func__
+                         << "\t : Error code = " << status.error_message()
+                         << endl;
+                }
+                if (debugMode <= DebugLevel::LevelError) {
+                    cout << __func__ << "\t : Retrying with timeout (ms) of "
+                         << currentBackoff << endl;
+                }
             }
         }
-        
-        if (error_code == grpc::StatusCode::DEADLINE_EXCEEDED){
+
+        if (error_code == grpc::StatusCode::DEADLINE_EXCEEDED) {
+            if (debugMode <= DebugLevel::LevelError) {
+                cout << __func__ << "\t : Failed because of timeout!" << endl;
+            }
             return SERVER_OFFLINE_ERROR_CODE;
         }
-        
+
         if (wres.err() == 0) {
             return wres.nbytes();
         } else {
+            if (debugMode <= DebugLevel::LevelError) {
+                cout << __func__ << "\t : Failed with write error returned as "
+                     << wres.err() << endl;
+            }
             return -wres.err();
         }
     }
 
     Status rpc_subscribeForNotifications() {
+        if (debugMode <= DebugLevel::LevelInfo) {
+            cout << __func__ << endl;
+        }
         ClientContext context;
         ClientCacheNotify notifyMessage;
         SubscribeForNotifications subReq;
@@ -197,7 +232,11 @@ class BlockStorageClient {
 
         while (reader->Read(&notifyMessage)) {
             int address = notifyMessage.address();
-            cout << __func__ << " invalidate cache with address: " << address << endl;
+            if (debugMode <= DebugLevel::LevelInfo) {
+                cout << __func__
+                     << "\t : Invalidate cache with address: " << address
+                     << endl;
+            }
             if (isCachingEnabled) {
                 cacheMap[address].invalidateCache();
             }
@@ -205,39 +244,51 @@ class BlockStorageClient {
 
         Status status = reader->Finish();
         if (!status.ok()) {
-            cout << __func__ << " Status returned as " << status.error_message() << endl;
+            if (debugMode <= DebugLevel::LevelError) {
+                cout << __func__ << "\t : Status returned as "
+                     << status.error_message() << endl;
+            }
         }
         return status;
     }
 
     void rpc_unSubscribeForNotifications() {
+        if (debugMode <= DebugLevel::LevelInfo) {
+            cout << __func__ << endl;
+        }
         ClientContext context;
         SubscribeForNotifications unSubReq, unSubRes;
 
         unSubReq.set_identifier(clientIdentifier);
 
-        Status status = stub_->rpc_unSubscribeForNotifications(&context, unSubReq, &unSubRes);
+        Status status = stub_->rpc_unSubscribeForNotifications(
+            &context, unSubReq, &unSubRes);
 
         if (status.ok() == false) {
-            cout << __func__ << " : gRPC status not ok!" << endl;
+            if (debugMode <= DebugLevel::LevelError) {
+                cout << __func__ << "\t : Status returned as "
+                     << status.error_message() << endl;
+            }
         }
-
     }
+
    private:
     std::unique_ptr<BlockStorageService::Stub> stub_;
 };
 
-struct ServerInfo{
+struct ServerInfo {
     string address;
-    BlockStorageClient* connection;
+    BlockStorageClient *connection;
 
-    void init(string address){
+    void init(string address) {
         this->address = address;
-        cout << "Initialize connection from client to " << address << endl;
-        this->connection =  new BlockStorageClient(grpc::CreateChannel(
-                            address.c_str(), grpc::InsecureChannelCredentials()));
+        cout << __func__ << "\t : Initialize connection from client to "
+             << address << endl;
+        this->connection = new BlockStorageClient(grpc::CreateChannel(
+            address.c_str(), grpc::InsecureChannelCredentials()));
     }
 };
+
 static vector<ServerInfo> serverInfos;
 static int currentServerIdx = 0;
 
@@ -259,7 +310,7 @@ int msleep(long msec) {
     return res;
 }
 
-string parseArgument(const string & argumentString, const string & option) {
+string parseArgument(const string &argumentString, const string &option) {
     string value;
 
     size_t pos = argumentString.find(option);
@@ -269,16 +320,16 @@ string parseArgument(const string & argumentString, const string & option) {
         value = argumentString.substr(pos, endPos - pos);
     }
 
-    cout << __func__ << " : Parsed = " << value << endl;
-
     return value;
 }
 
-bool isIPValid(const string & address) {
+bool isIPValid(const string &address) {
     size_t ipEndPos = address.find(":");
     string ipAddress = address.substr(0, ipEndPos);
     struct sockaddr_in sa;
-    int result = (ipAddress == "localhost") ? 1 : inet_pton(AF_INET, ipAddress.c_str(), &(sa.sin_addr));
+    int result = (ipAddress == "localhost")
+                     ? 1
+                     : inet_pton(AF_INET, ipAddress.c_str(), &(sa.sin_addr));
     if (result == 0) {
         return false;
     }
@@ -288,21 +339,28 @@ bool isIPValid(const string & address) {
 }
 
 void cacheInvalidationListener() {
-    cout << __func__ << " : Listening for notifications.." << endl;
+    cout << __func__ << "\t : Listening for notifications.." << endl;
     Status status = grpc::Status::OK;
     do {
-        status = (serverInfos[currentServerIdx].connection)->rpc_subscribeForNotifications();
-        cout << __func__ << " : Error code = " << status.error_code() << " and message = " << status.error_message() << endl; 
-        if (status.error_code() == grpc::StatusCode::UNAVAILABLE) { 
-            currentServerIdx = (currentServerIdx+1)%serverInfos.size();
-            cout <<__func__ << " : Changing to backup server = " << currentServerIdx << endl;
+        status = (serverInfos[currentServerIdx].connection)
+                     ->rpc_subscribeForNotifications();
+        if (debugMode <= DebugLevel::LevelInfo) {
+            cout << __func__ << "\t : Error code = " << status.error_code()
+                 << " and message = " << status.error_message() << endl;
+        }
+        if (status.error_code() == grpc::StatusCode::UNAVAILABLE) {
+            currentServerIdx = (currentServerIdx + 1) % serverInfos.size();
+            if (debugMode <= DebugLevel::LevelError) {
+                cout << __func__ << "\t : Changing to backup server "
+                     << serverInfos[currentServerIdx].address << endl;
+            }
         }
     } while (grpc::StatusCode::UNAVAILABLE == status.error_code());
-    cout << __func__ << " : Stopped listening for notifications now." << endl;
+    cout << __func__ << "\t : Stopped listening for notifications now." << endl;
 }
 
-void initServerInfo(vector<string> addresses){
-    for(string address : addresses){
+void initServerInfo(vector<string> addresses) {
+    for (string address : addresses) {
         ServerInfo serverInfo;
         serverInfo.init(address);
         serverInfos.push_back(serverInfo);
@@ -316,45 +374,45 @@ bool CacheInfo::isStale() {
     get_time(&curTime);
     double timeDiff = get_time_diff(&lastRefreshTs, &curTime);
     isCached = isCached && (timeDiff < stalenessLimit);
-    // cout << __func__ << " Time Diff = " << timeDiff << endl;
     return !isCached;
 }
 
-void CacheInfo::cacheData(const string & data) {
+void CacheInfo::cacheData(const string &data) {
     this->data = data;
     isCached = true;
     get_time(&lastRefreshTs);
 }
 
-void generateClientIdentifier(){
+void generateClientIdentifier() {
     int identifierLength = 32;
 
     const char alphanum[] =
-                                "0123456789"
-                                "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                                "abcdefghijklmnopqrstuvwxyz";
+        "0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
     clientIdentifier.reserve(identifierLength);
 
     std::random_device dev;
     std::mt19937 rng(dev());
-    std::uniform_int_distribution<std::mt19937::result_type> dist6(0,identifierLength - 1); // distribution in range [1, 6]
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(
+        0, identifierLength - 1);  // distribution in range [1, 6]
 
     for (int i = 0; i < identifierLength; ++i) {
         clientIdentifier += alphanum[dist6(rng)];
     }
-    cout << "generated client identifier " << clientIdentifier << endl;
+    cout << __func__ << "\t : Generated client identifier " << clientIdentifier
+         << endl;
 }
 
-
 int switchServerConnection() {
-    cout << __func__ << " : Primary server is offline!" << endl;
-    
-    currentServerIdx = (currentServerIdx+1)%serverInfos.size();
+    cout << __func__ << "\t : Primary server is offline!" << endl;
+
+    currentServerIdx = (currentServerIdx + 1) % serverInfos.size();
 
     notificationThread.join();
     notificationThread = (std::thread(cacheInvalidationListener));
     msleep(1);
-    
-    printf("%s \t: Changing to server at %s...\n", __func__,
-           serverInfos[currentServerIdx].address.c_str());
+
+    cout << __func__ << "\t : Changing to server at "
+         << serverInfos[currentServerIdx].address << endl;
 }

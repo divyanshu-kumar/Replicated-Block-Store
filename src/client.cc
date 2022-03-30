@@ -2,101 +2,153 @@
 
 int run_application(bool isReadOnlyMode);
 
-
-bool checkIfOffsetIsAligned(uint32_t &offset){
+bool checkIfOffsetIsAligned(uint32_t &offset) {
     return offset % BLOCK_SIZE_BYTES == 0;
 }
 
-bool cacheStalenessValidation(const vector<uint32_t> &addressVector){
-    for(auto address : addressVector){
-        if(!cacheMap[address].isCached || cacheMap[address].isStale())
+bool cacheStalenessValidation(const vector<uint32_t> &addressVector) {
+    for (auto &address : addressVector) {
+        if (!cacheMap[address].isCached || cacheMap[address].isStale())
             return false;
     }
     return true;
 }
 
-static int client_read(uint32_t offset, string & buf, bool readFromBackup = false) {
-    // printf("%s : Address = %d\n", __func__, offset);
-    int res = 0;
+static int client_read(uint32_t offset, string &buf,
+                       bool readFromBackup = false) {
+    if (debugMode <= DebugLevel::LevelInfo) {
+        cout << __func__ << "\t : Offset = " << offset
+             << ", ReadFromBackup = " << readFromBackup << endl;
+    }
 
-    uint32_t address = offset  / BLOCK_SIZE_BYTES;
+    uint32_t address = offset / BLOCK_SIZE_BYTES;
     vector<uint32_t> addressVector = {address};
     bool isAlignedRead = checkIfOffsetIsAligned(offset);
     uint32_t readSize = BLOCK_SIZE_BYTES;
-    if(!isAlignedRead){
-        addressVector.push_back(address+1);
+
+    if (!isAlignedRead) {
+        if (debugMode <= DebugLevel::LevelInfo) {
+            cout << __func__ << "\t : Non-Aligned Read Case" << endl;
+        }
+        addressVector.push_back(address + 1);
         readSize = 2 * BLOCK_SIZE_BYTES;
     }
 
-    if (isCachingEnabled) {
-        if (cacheStalenessValidation(addressVector)) {
-            cout << __func__ << " : Cached data found for file with Address " << address << endl;
-            int startIdx = offset % BLOCK_SIZE_BYTES;
-            buf = cacheMap[address].data;
-            if(!isAlignedRead)
-                buf += cacheMap[address+1].data;
-            buf = buf.substr(startIdx, BLOCK_SIZE_BYTES);
-            return res = buf.length();
+    if (isCachingEnabled && cacheStalenessValidation(addressVector)) {
+        if (debugMode <= DebugLevel::LevelInfo) {
+            cout << __func__ << "\t : Cached data found!" << endl;
         }
-        else {
-            // cout << __func__ << "Cached data not found for file " << address << endl;
+        int startIdx = offset % BLOCK_SIZE_BYTES;
+        buf = cacheMap[address].data;
+        if (!isAlignedRead) {
+            buf.append(cacheMap[address + 1].data.substr(
+                0, BLOCK_SIZE_BYTES - buf.length()));
         }
+        return buf.length();
     }
 
-    int serverToContactIdx = readFromBackup ? (currentServerIdx + 1) % 2 : currentServerIdx;
+    int serverToContactIdx =
+        readFromBackup ? (currentServerIdx + 1) % 2 : currentServerIdx;
 
-    res = (serverInfos[serverToContactIdx].connection)->rpc_read(address, buf, readSize, offset);
-    cout << __func__ << " res: " << res << " from server id "<<serverToContactIdx << endl;
+    if (debugMode <= DebugLevel::LevelInfo) {
+        cout << __func__ << "\t : Contacting server "
+             << serverInfos[serverToContactIdx].address << endl;
+    }
+
+    int res = (serverInfos[serverToContactIdx].connection)
+                  ->rpc_read(address, buf, readSize, offset);
+
     if (res == SERVER_OFFLINE_ERROR_CODE) {
+        if (debugMode <= DebugLevel::LevelInfo) {
+            cout << __func__
+                 << "\t : Read request timed-out, trying to contact other "
+                    "server now."
+                 << endl;
+        }
         if (!readFromBackup) {
             switchServerConnection();
         }
-
-        res = (serverInfos[currentServerIdx].connection)->rpc_read(address, buf, readSize, offset);
-        cout << __func__ << " res: " << res << " from server id "<<currentServerIdx << endl;
-        if(res < 0){
-            cout << __func__ << " : Both servers are offline!" << endl;
+        res = (serverInfos[currentServerIdx].connection)
+                  ->rpc_read(address, buf, readSize, offset);
+        if (res < 0) {
+            if (debugMode <= DebugLevel::LevelError) {
+                cout << __func__ << "\t : Both servers are offline!" << endl;
+            }
             return -1;
         }
     }
+
     if (isCachingEnabled) {
-        // cout << __func__ << "Cached data successfully for file " << address << endl;
-        cacheMap[address].cacheData(buf.substr(0,BLOCK_SIZE_BYTES));
-        if(!isAlignedRead) {
-            cacheMap[address+1].cacheData(buf.substr(BLOCK_SIZE_BYTES, BLOCK_SIZE_BYTES));
+        if (debugMode <= DebugLevel::LevelInfo) {
+            cout << __func__ << "\t : Caching address : " << address;
+        }
+        cacheMap[address].cacheData(buf.substr(0, BLOCK_SIZE_BYTES));
+        if (!isAlignedRead) {
+            if (debugMode <= DebugLevel::LevelInfo) {
+                cout << " and " << address + 1;
+            }
+            cacheMap[address + 1].cacheData(buf.substr(BLOCK_SIZE_BYTES));
             buf = buf.substr(offset, BLOCK_SIZE_BYTES);
         }
+        if (debugMode <= DebugLevel::LevelInfo) {
+            cout << endl;
+        }
     }
+
     return res;
 }
 
-static int client_write(uint32_t offset, const string & buf) {
+static int client_write(uint32_t offset, const string &buf) {
+    if (debugMode <= DebugLevel::LevelInfo) {
+        cout << __func__ << "\t : Offset = " << offset << endl;
+    }
 
-    uint32_t address = offset  / BLOCK_SIZE_BYTES;
+    uint32_t address = offset / BLOCK_SIZE_BYTES;
     bool isAlignedWrite = checkIfOffsetIsAligned(offset);
 
-    if (isCachingEnabled) {
-        cout << __func__ << " : Invalidating cache for file " << address << endl;
-        cacheMap[address].invalidateCache();
-        if(!isAlignedWrite)
-            cacheMap[address+1].invalidateCache();
+    if (!isAlignedWrite && debugMode <= DebugLevel::LevelInfo) {
+        cout << __func__ << "\t : Unaligned write. Addresses = " << address
+             << " and " << address + 1 << endl;
     }
-    
-    int res = (serverInfos[currentServerIdx].connection)->rpc_write(address, buf, offset);
-    if(res == SERVER_OFFLINE_ERROR_CODE) {
+
+    if (isCachingEnabled) {
+        if (debugMode <= DebugLevel::LevelInfo) {
+            cout << __func__ << "\t : Invalidating cache for address "
+                 << address << endl;
+        }
+        cacheMap[address].invalidateCache();
+        if (!isAlignedWrite) {
+            cacheMap[address + 1].invalidateCache();
+        }
+    }
+
+    int res = (serverInfos[currentServerIdx].connection)
+                  ->rpc_write(address, buf, offset);
+
+    if (res == SERVER_OFFLINE_ERROR_CODE) {
+        if (debugMode <= DebugLevel::LevelInfo) {
+            cout << __func__
+                 << "\t : Write request timed-out, trying to contact other "
+                    "server now."
+                 << endl;
+        }
         switchServerConnection();
-        int res = (serverInfos[currentServerIdx].connection)->rpc_write(address, buf, offset);
-        if(res < 0){
-            cout << __func__ << " : Both servers are offline!" << endl;
+        res = (serverInfos[currentServerIdx].connection)
+                  ->rpc_write(address, buf, offset);
+        if (res < 0) {
+            if (debugMode <= DebugLevel::LevelError) {
+                cout << __func__ << "\t : Both servers are offline!" << endl;
+            }
             return -1;
         }
     }
+
     return res;
 }
 
 int main(int argc, char *argv[]) {
     srand(time(NULL));
-    
+
     if (debugMode <= DebugLevel::LevelInfo) {
         printf("%s \t: %s\n", __func__, argv[0]);
     }
@@ -118,10 +170,12 @@ int main(int argc, char *argv[]) {
         string address;
 
         do {
-            string addressArg = "--address" + to_string(addresses.size() + 1) + "=";
+            string addressArg =
+                "--address" + to_string(addresses.size() + 1) + "=";
             address = parseArgument(argumentString, addressArg);
             if (!address.empty() && !isIPValid(address)) {
-                cout << "Enter a valid IP address and try again!"
+                cout << __func__
+                     << "\t : Enter a valid IP address and try again!"
                      << " Invalid IP = " << address << endl;
                 return 0;
             }
@@ -131,7 +185,7 @@ int main(int argc, char *argv[]) {
         } while (!address.empty());
 
         isReadOnlyMode = !parseArgument(argumentString, "--readOnly=").empty();
-        cout << "Read Only = " << isReadOnlyMode << endl;
+        cout << __func__ << "\t : Read Only Mode = " << isReadOnlyMode << endl;
     }
 
     if (addresses.empty()) {
@@ -148,7 +202,6 @@ int main(int argc, char *argv[]) {
     return run_application(isReadOnlyMode);
 }
 
-
 int run_application(bool isReadOnlyMode) {
     vector<pair<double, int>> readTimes, writeTimes;
 
@@ -158,94 +211,107 @@ int run_application(bool isReadOnlyMode) {
 
     std::random_device dev;
     std::mt19937 rng(dev());
-    std::uniform_int_distribution<std::mt19937::result_type> dist6(0,50);
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 50);
 
-    const int NUM_RUNS = 500;
+    const int NUM_RUNS = 50;
+
     for (int i = 0; i < NUM_RUNS; i++) {
         string buf;
-        uint32_t address = i % NUM_RUNS;//max(0, rand()) % totalBlocks;
-        
+        uint32_t address = i % NUM_RUNS;  // max(0, rand()) % totalBlocks;
+
         struct timespec read_start, read_end;
         get_time(&read_start);
-        
-        int num_bytes_read = client_read(address * BLOCK_SIZE_BYTES, buf, isReadOnlyMode);
-        
+
+        int num_bytes_read =
+            client_read(address * BLOCK_SIZE_BYTES, buf, isReadOnlyMode);
+
         get_time(&read_end);
-        readTimes.push_back(make_pair(get_time_diff(&read_start, &read_end), address));
-        
-        if (num_bytes_read != 4096) {
-            printf("Didn't read 4k bytes from this file! Instead read %d bytes!\n", num_bytes_read);
+        readTimes.push_back(
+            make_pair(get_time_diff(&read_start, &read_end), address));
+
+        if ((num_bytes_read != 4096) && (debugMode <= DebugLevel::LevelError)) {
+            printf(
+                "Didn't read 4k bytes from this file! Instead read %d bytes!\n",
+                num_bytes_read);
         }
-        
+
         msleep((int)dist6(rng));
 
         // Testing cache
         get_time(&read_start);
-        
-        num_bytes_read = client_read(address * BLOCK_SIZE_BYTES, buf, isReadOnlyMode);
-        
+
+        num_bytes_read =
+            client_read(address * BLOCK_SIZE_BYTES, buf, isReadOnlyMode);
+
         get_time(&read_end);
-        readTimes.push_back(make_pair(get_time_diff(&read_start, &read_end), address));
-        
-        if (num_bytes_read != 4096) {
-            printf("Didn't read 4k bytes from this file! Instead read %d bytes!\n", num_bytes_read);
+        readTimes.push_back(
+            make_pair(get_time_diff(&read_start, &read_end), address));
+
+        if ((num_bytes_read != 4096) && (debugMode <= DebugLevel::LevelError)) {
+            printf(
+                "Didn't read 4k bytes from this file! Instead read %d bytes!\n",
+                num_bytes_read);
         }
 
         msleep((int)dist6(rng));
 
-        address = i % NUM_RUNS;//max(0, rand()) % totalBlocks;
-        
+        address = i % NUM_RUNS;  // max(0, rand()) % totalBlocks;
+
         struct timespec write_start, write_end;
         get_time(&write_start);
-        
+
         int num_bytes_write = 0;
-        
+
         if (!isReadOnlyMode)
-            num_bytes_write = client_write(address * BLOCK_SIZE_BYTES, write_data);
-        
+            num_bytes_write =
+                client_write(address * BLOCK_SIZE_BYTES, write_data);
+
         get_time(&write_end);
-        writeTimes.push_back(make_pair(get_time_diff(&write_start, &write_end), address));
-        
-        if (!isReadOnlyMode && num_bytes_write != 4096) {
+        writeTimes.push_back(
+            make_pair(get_time_diff(&write_start, &write_end), address));
+
+        if ((!isReadOnlyMode) && (num_bytes_write != 4096) &&
+            (debugMode <= DebugLevel::LevelError)) {
             printf("Didn't write 4k bytes to this file!\n");
         }
-        
+
         msleep((int)dist6(rng));
     }
 
     double meanReadTime = 0;
-    for (auto & readTime : readTimes) {
+    for (auto &readTime : readTimes) {
         meanReadTime += readTime.first;
     }
     meanReadTime /= readTimes.size();
 
     double meanWriteTime = 0;
-    for (auto & writeTime : writeTimes) {
+    for (auto &writeTime : writeTimes) {
         meanWriteTime += writeTime.first;
     }
     meanWriteTime /= writeTimes.size();
-  
+
     sort(readTimes.begin(), readTimes.end());
     sort(writeTimes.begin(), writeTimes.end());
 
     double medianReadTime = readTimes[readTimes.size() / 2].first;
     double medianWriteTime = writeTimes[writeTimes.size() / 2].first;
 
-    printf("%s : *****STATS (milliseconds) *****\n"
-            "meanRead   = %f \t meanWrite   = %f \n"
-            "medianRead = %f \t medianWrite = %f\n"
-            "minRead    = %f \t minWrite    = %f\n"
-            "minAddress = %d \t minAddress  = %d\n"
-            "maxRead    = %f \t maxWrite    = %f\n"
-            "maxAddress = %d \t maxAddress  = %d\n",
-            __func__, meanReadTime, meanWriteTime,
-            medianReadTime, medianWriteTime,
-            readTimes.front().first, writeTimes.front().first,
-            readTimes.front().second, writeTimes.front().second,
-            readTimes.back().first, writeTimes.back().first,
-            readTimes.back().second, writeTimes.back().second);
+    printf(
+        "%s : *****STATS (milliseconds) *****\n"
+        "meanRead   = %f \t meanWrite   = %f \n"
+        "medianRead = %f \t medianWrite = %f\n"
+        "minRead    = %f \t minWrite    = %f\n"
+        "minAddress = %d \t minAddress  = %d\n"
+        "maxRead    = %f \t maxWrite    = %f\n"
+        "maxAddress = %d \t maxAddress  = %d\n",
+        __func__, meanReadTime, meanWriteTime, medianReadTime, medianWriteTime,
+        readTimes.front().first, writeTimes.front().first,
+        readTimes.front().second, writeTimes.front().second,
+        readTimes.back().first, writeTimes.back().first,
+        readTimes.back().second, writeTimes.back().second);
 
-    (serverInfos[currentServerIdx].connection)->rpc_unSubscribeForNotifications();
+    (serverInfos[currentServerIdx].connection)
+        ->rpc_unSubscribeForNotifications();
     notificationThread.join();
 
     return 0;
