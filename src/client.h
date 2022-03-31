@@ -236,24 +236,17 @@ struct ServerInfo {
     string address;
     BlockStorageClient *connection;
 
-    ServerInfo(string addr) : address(addr), 
+    ServerInfo(string addr) : 
+        address(addr), 
         connection(new BlockStorageClient(grpc::CreateChannel(
-            address.c_str(), grpc::InsecureChannelCredentials()))) { 
+                        address.c_str(), grpc::InsecureChannelCredentials()))) { 
         cout << __func__ << "\t : Initialize connection from client to "
              << address << endl;
     }
-    // void init(string address) {
-    //     this->address = address;
-    //     cout << __func__ << "\t : Initialize connection from client to "
-    //          << address << endl;
-    //     this->connection = new BlockStorageClient(grpc::CreateChannel(
-    //         address.c_str(), grpc::InsecureChannelCredentials()));
-    // }
 };
 
-void cacheInvalidationListener(vector<ServerInfo*> & serverInfos, int currentServerIdx,
+void cacheInvalidationListener(vector<ServerInfo*> & serverInfos, int & currentServerIdx,
     bool isCachingEnabled, string clientIdentifier, vector<CacheInfo> & cacheMap);
-
 
 bool CacheInfo::isStale() {
     struct timespec curTime;
@@ -288,13 +281,14 @@ class Client {
     public:
     string clientIdentifier;
     std::thread notificationThread;
-    int currentServerIdx;
+    int currentServerIdx, clientThreadId;
     vector<ServerInfo*> serverInfos;
     vector<CacheInfo> cacheMap;
     bool readFromBackup, isCachingEnabled;
 
-    Client(vector<string> &serverAddresses, bool cachingEnabled, bool isReadFromBackup = false) 
-        : cacheMap(numBlocks) {
+    Client(vector<string> &serverAddresses, bool cachingEnabled, 
+            int threadId, bool isReadFromBackup = false) 
+        : cacheMap(numBlocks), clientThreadId(threadId) {
         isCachingEnabled = cachingEnabled;
         readFromBackup = isReadFromBackup;
         currentServerIdx = 0;
@@ -303,10 +297,11 @@ class Client {
         printf("%s \t: Connecting to server at %s...\n", __func__,
            serverInfos[currentServerIdx]->address.c_str());
         //run_application();
-        cout << __func__ << "\t : Client created with id = " <<  clientIdentifier << endl;
+        cout << __func__ << "\t : Client tid = " << clientThreadId 
+             << " created with id = " <<  clientIdentifier << endl;
     }
 
-    int run_application(int threadId);
+    int run_application();
 
     int client_read(uint32_t offset, string &buf);
     int client_write(uint32_t offset, const string &buf);
@@ -315,14 +310,16 @@ class Client {
         for (string address : addresses) {
             serverInfos.push_back(new ServerInfo(address));
         }
-        notificationThread = (std::thread(cacheInvalidationListener, std::ref(serverInfos), currentServerIdx, 
-            isCachingEnabled, clientIdentifier, std::ref(cacheMap)));
+        notificationThread = (std::thread(cacheInvalidationListener, std::ref(serverInfos),
+            std::ref(currentServerIdx), isCachingEnabled, clientIdentifier, std::ref(cacheMap)));
         msleep(1);
     }
 
     ~Client() {
+        (serverInfos[currentServerIdx]->connection)->rpc_unSubscribeForNotifications(clientIdentifier);
+        notificationThread.join();
         for (int i = 0; i < serverInfos.size(); i++) {
-            delete serverInfos[i]->connection;
+            delete serverInfos[i];
         }
     }
 };

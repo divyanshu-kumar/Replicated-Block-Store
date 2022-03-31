@@ -149,7 +149,7 @@ int Client::client_write(uint32_t offset, const string &buf) {
     return res;
 }
 
-void cacheInvalidationListener(vector<ServerInfo*> & serverInfos, int currentServerIdx,
+void cacheInvalidationListener(vector<ServerInfo*> & serverInfos, int & currentServerIdx,
     bool isCachingEnabled, string clientIdentifier, vector<CacheInfo> & cacheMap) {
     cout << __func__ << "\t : Listening for notifications.." << endl;
     Status status = grpc::Status::OK;
@@ -239,11 +239,11 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < numClients; i++) {
         allReadTimes.push_back({});
         allWriteTimes.push_back({});
-        ourClients.push_back(new Client(addresses, isCachingEnabled, isReadOnlyMode));    
+        ourClients.push_back(new Client(addresses, isCachingEnabled, i, isReadOnlyMode));    
     }
     vector<thread> threads;
     for (int i = 0; i < numClients; i++) {
-        threads.push_back(thread(&Client::run_application, ourClients[i], i));
+        threads.push_back(thread(&Client::run_application, ourClients[i]));
     }
     for (int i = 0; i < numClients; i++) {
         threads[i].join();
@@ -255,9 +255,9 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-int Client::run_application(int threadId) {
-    vector<pair<double, int>> &readTimes = allReadTimes[threadId], 
-                              &writeTimes = allWriteTimes[threadId];
+int Client::run_application() {
+    vector<pair<double, int>> &readTimes = allReadTimes[clientThreadId],
+                              &writeTimes = allWriteTimes[clientThreadId];
 
     string write_data = string(4096, 'x');
 
@@ -265,7 +265,7 @@ int Client::run_application(int threadId) {
 
     std::random_device dev;
     std::mt19937 rng(dev());
-    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 200);
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 100);
 
     std::uniform_int_distribution<std::mt19937::result_type> dist7(0, 20000);
     const int NUM_RUNS = 50;
@@ -328,12 +328,8 @@ int Client::run_application(int threadId) {
             printf("Didn't write 4k bytes to this file! Instead wrote %d bytes.\n", num_bytes_write);
         }
 
-        msleep(2 * (int)dist6(rng));
+        msleep((int)dist6(rng));
     }
-
-    (serverInfos[currentServerIdx]->connection)
-        ->rpc_unSubscribeForNotifications(clientIdentifier);
-    notificationThread.join();
 
     return 0;
 }

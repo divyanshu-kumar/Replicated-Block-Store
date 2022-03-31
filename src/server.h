@@ -19,7 +19,7 @@ using namespace BlockStorage;
 using namespace std;
 const int MAX_NUM_RETRIES = 3;
 const int INITIAL_BACKOFF_MS = 10;
-const int MULTIPLIER = 1;
+const int MULTIPLIER = 2;
 string currentWorkDir, dataDirPath, writeTxLogsDirPath;
 
 static string role, other_address, my_address;
@@ -206,7 +206,7 @@ class ServerReplication final : public BlockStorageService::Service {
                 blockLock[rr->address() + 1].lock();
             }
         } else {
-            backupBlockRead(rr->address(), isReadAligned);
+            // backupBlockRead(rr->address(), isReadAligned);
         }
 
         bool isCachingRequested =
@@ -296,12 +296,12 @@ class ServerReplication final : public BlockStorageService::Service {
         int bytes_written_local = localWrite(wr->address(), wr->offset(), wr->buffer(), dataDirPath);
 
         if (currentRole == "backup") {
-            struct timespec currentTime;
-            get_time(&currentTime);
-            backupLastWriteTime[wr->address()] = currentTime;
-            if (!isAlignedWrite) {
-                backupLastWriteTime[wr->address() + 1] = currentTime;
-            }
+            // struct timespec currentTime;
+            // get_time(&currentTime);
+            // backupLastWriteTime[wr->address()] = currentTime;
+            // if (!isAlignedWrite) {
+            //     backupLastWriteTime[wr->address() + 1] = currentTime;
+            // }
         }
 
         if (bytes_written_local == -1) {
