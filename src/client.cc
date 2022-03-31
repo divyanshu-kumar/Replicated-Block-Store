@@ -65,9 +65,6 @@ int Client::client_read(uint32_t offset, string &buf) {
                     "server now."
                  << endl;
         }
-        // if (!readFromBackup) {
-        //     switchServerConnection();
-        // }
         res = (serverInfos[currentServerIdx]->connection)
                   ->rpc_read(address, buf, readSize, offset, isCachingEnabled, 
                   clientIdentifier, currentServerIdx);
@@ -134,7 +131,6 @@ int Client::client_write(uint32_t offset, const string &buf) {
                     "server now."
                  << endl;
         }
-        // switchServerConnection();
         res = (serverInfos[currentServerIdx]->connection)
                   ->rpc_write(address, buf, offset, clientIdentifier, 
                   currentServerIdx);
@@ -267,7 +263,7 @@ int Client::run_application() {
     std::mt19937 rng(dev());
     std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 100);
 
-    std::uniform_int_distribution<std::mt19937::result_type> dist7(0, 20000);
+    std::uniform_int_distribution<std::mt19937::result_type> dist7(0, (int)((MAX_SIZE_BYTES / BLOCK_SIZE_BYTES) - 1));
     const int NUM_RUNS = 50;
 
     for (int i = 0; i < NUM_RUNS; i++) {
@@ -335,12 +331,13 @@ int Client::run_application() {
 }
 
 void printPercentileTimes(const vector<pair<double, int>> &readTimes, const vector<pair<double, int>> &writeTimes){
-    cout<<"Percentile Read/Write Times " << endl;
+    cout << "----------------------------------" << endl;
+    cout<<"Percentile \t Read(ms) \t Write(ms)" << endl;
     vector<int> percentiles = {10,20,30,40,50,60,70,80,90,95,96,97,98,99,100};
     for(int percentile : percentiles) {
         int readItr = ((readTimes.size()-1) * percentile)/100, writeItr = ((writeTimes.size()-1) * percentile)/100;
         double readTime = readTimes[readItr].first , writeTime = writeTimes[writeItr].first;
-        printf("%d \t percentile Read = %f \t Write = %f\n", percentile, readTime, writeTime);
+        printf("%d \t \t %f \t %f \n", percentile, readTime, writeTime);
     }
 }
 

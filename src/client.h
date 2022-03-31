@@ -10,13 +10,9 @@ using grpc::Status;
 using namespace BlockStorage;
 using namespace std;
 
-const int MAX_NUM_RETRIES = 6;
+const int MAX_NUM_RETRIES = 10;
 const int INITIAL_BACKOFF_MS = 50;
 const int MULTIPLIER = 2;
-
-vector<string> addresses;
-
-// int switchServerConnection();
 
 struct CacheInfo {
     bool isCached;
@@ -79,7 +75,7 @@ class BlockStorageClient {
                 }
                 if (debugMode <= DebugLevel::LevelError) {
                     cout << __func__ << "\t : Retrying to " 
-                         << addresses[currentServerIdx] << " with timeout (ms) of "
+                         << currentServerIdx << " with timeout (ms) of "
                          << currentBackoff << " MULTIPLIER = " << MULTIPLIER << endl;
                 }
             }
@@ -148,7 +144,7 @@ class BlockStorageClient {
                 }
                 if (debugMode <= DebugLevel::LevelError) {
                     cout << __func__ << "\t : Retrying to " 
-                         << addresses[currentServerIdx] << " with timeout (ms) of "
+                         << currentServerIdx << " with timeout (ms) of "
                          << currentBackoff << endl;
                 }
             }
@@ -240,8 +236,10 @@ struct ServerInfo {
         address(addr), 
         connection(new BlockStorageClient(grpc::CreateChannel(
                         address.c_str(), grpc::InsecureChannelCredentials()))) { 
-        cout << __func__ << "\t : Initialize connection from client to "
-             << address << endl;
+        if (debugMode <= DebugLevel::LevelInfo) {
+            cout << __func__ << "\t : Initialize connection from client to "
+                 << address << endl;
+        }
     }
 };
 
@@ -262,21 +260,6 @@ void CacheInfo::cacheData(const string &data) {
     get_time(&lastRefreshTs);
 }
 
-// int switchServerConnection() {
-//     cout << __func__ << "\t : Primary server is offline!" << endl;
-
-//     // Commenting out as this functionality is being handled by subscription
-//     // service now. But discuss it with team - **TODO**.
-//     //currentServerIdx = (currentServerIdx + 1) % serverInfos.size();
-
-//     //notificationThread.join();
-//     //notificationThread = (std::thread(cacheInvalidationListener));
-//     msleep(1);
-
-//     cout << __func__ << "\t : Changing to server at "
-//          << getServerName(currentServerIdx) << endl;
-// }
-
 class Client {
     public:
     string clientIdentifier;
@@ -294,9 +277,10 @@ class Client {
         currentServerIdx = 0;
         clientIdentifier = generateClientIdentifier();
         initServerInfo(serverAddresses);
-        printf("%s \t: Connecting to server at %s...\n", __func__,
-           serverInfos[currentServerIdx]->address.c_str());
-        //run_application();
+        if (debugMode <= DebugLevel::LevelInfo) {
+            printf("%s \t: Connecting to server at %s...\n", __func__,
+            serverInfos[currentServerIdx]->address.c_str());
+        }
         cout << __func__ << "\t : Client tid = " << clientThreadId 
              << " created with id = " <<  clientIdentifier << endl;
     }

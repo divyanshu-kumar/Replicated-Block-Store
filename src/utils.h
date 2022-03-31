@@ -103,7 +103,6 @@ string generateClientIdentifier(){
     for (int i = 0; i < identifierLength; ++i) {
         clientIdentifierString += alphanum[dist6(rng)];
     }
-    cout << "generated client identifier " << clientIdentifierString << endl;
     return clientIdentifierString;
 }
 

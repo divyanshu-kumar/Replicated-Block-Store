@@ -17,7 +17,7 @@ using grpc::Status;
 using grpc::StatusCode;
 using namespace BlockStorage;
 using namespace std;
-const int MAX_NUM_RETRIES = 3;
+const int MAX_NUM_RETRIES = 5;
 const int INITIAL_BACKOFF_MS = 10;
 const int MULTIPLIER = 2;
 string currentWorkDir, dataDirPath, writeTxLogsDirPath;
