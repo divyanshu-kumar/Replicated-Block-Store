@@ -1,9 +1,9 @@
 #include "client.h"
 
 int run_application(bool isReadOnlyMode);
+void printStats();
 
 vector<vector<pair<double, int>>> allReadTimes, allWriteTimes;
-void printStats();
 
 bool cacheStalenessValidation(const vector<uint32_t> &addressVector, 
     vector<CacheInfo> & cacheMap) {
@@ -338,6 +338,16 @@ int Client::run_application(int threadId) {
     return 0;
 }
 
+void printPercentileTimes(const vector<pair<double, int>> &readTimes, const vector<pair<double, int>> &writeTimes){
+    cout<<"Percentile Read/Write Times " << endl;
+    vector<int> percentiles = {10,20,30,40,50,60,70,80,90,95,96,97,98,99,100};
+    for(int percentile : percentiles) {
+        int readItr = ((readTimes.size()-1) * percentile)/100, writeItr = ((writeTimes.size()-1) * percentile)/100;
+        double readTime = readTimes[readItr].first , writeTime = writeTimes[writeItr].first;
+        printf("%d \t percentile Read = %f \t Write = %f\n", percentile, readTime, writeTime);
+    }
+}
+
 void printStats() {
     vector<pair<double, int>> readTimes, writeTimes;
     for (auto readTime : allReadTimes) {
@@ -383,4 +393,6 @@ void printStats() {
         readTimes.front().second, writeTimes.front().second,
         readTimes.back().first, writeTimes.back().first,
         readTimes.back().second, writeTimes.back().second);
+
+    printPercentileTimes(readTimes, writeTimes);
 }
