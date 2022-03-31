@@ -138,10 +138,18 @@ static NotificationInfo notificationManager;
 
 class ServerReplication final : public BlockStorageService::Service {
    public:
-    ServerReplication() {}
+
+    unordered_map<int, string> inMemoryCachedBlocks;
+    bool inMemoryCacheEnable = true;
+
+    ServerReplication() {
+        inMemoryCachedBlocks.clear();
+    }
 
     ServerReplication(std::shared_ptr<Channel> channel)
-        : stub_(BlockStorageService::NewStub(channel)) {}
+        : stub_(BlockStorageService::NewStub(channel)) {
+            inMemoryCachedBlocks.clear();
+        }
 
     int rpc_write(uint32_t address, const string& buf, uint32_t offset) {
         if (debugMode <= DebugLevel::LevelInfo) {
@@ -224,26 +232,33 @@ class ServerReplication final : public BlockStorageService::Service {
         int res = 0;
 
         for (int idx = 0; idx < rr->size() / BLOCK_SIZE_BYTES; idx++) {
-            string blockAddress =
-                dataDirPath + "/" + to_string(rr->address() + idx);
-            int fd = open(blockAddress.c_str(), O_RDONLY);
+            int blockId = rr->address() + idx;
 
-            if (fd == -1) {
-                reply->set_err(errno);
-                printf("%s \t : ", __func__);
-                perror(strerror(errno));
-                return Status::OK;
-            }
+            if(inMemoryCacheEnable && (inMemoryCachedBlocks.find(blockId) != inMemoryCachedBlocks.end())) {
+                // load buffer from inMemoryCache and avoid fopen call
+                std::strcpy(buf + (idx * BLOCK_SIZE_BYTES), inMemoryCachedBlocks[blockId].c_str());
+                res = BLOCK_SIZE_BYTES;
+            } else {
+                // not present inMemoryCache, so perform file open and cache it as well
+                string blockAddress = dataDirPath + "/" + to_string(blockId);
+                int fd = open(blockAddress.c_str(), O_RDONLY);
 
-            res =
-                pread(fd, buf + (idx * BLOCK_SIZE_BYTES), BLOCK_SIZE_BYTES, 0);
-            if (res == -1) {
-                reply->set_err(errno);
-                printf("%s \t : ", __func__);
-                perror(strerror(errno));
-                return Status::OK;
+                if (fd == -1) {
+                    reply->set_err(errno);
+                    printf("%s \t : ", __func__);
+                    perror(strerror(errno));
+                    return Status::OK;
+                }
+
+                res = pread(fd, buf + (idx * BLOCK_SIZE_BYTES), BLOCK_SIZE_BYTES, 0);
+                if (res == -1) {
+                    reply->set_err(errno);
+                    printf("%s \t : ", __func__);
+                    perror(strerror(errno));
+                    return Status::OK;
+                }
+                if (fd > 0) close(fd);
             }
-            if (fd > 0) close(fd);
         }
 
         buf[(int)rr->size()] = '\0';
@@ -253,7 +268,7 @@ class ServerReplication final : public BlockStorageService::Service {
         reply->set_err(0);
         free(buf);
 
-        blockLock[rr->address()].unlock();
+        // blockLock[rr->address()].unlock();  TODO
 
         if (currentRole == "primary") {
             blockLock[rr->address()].unlock();
@@ -293,7 +308,8 @@ class ServerReplication final : public BlockStorageService::Service {
             res = logWriteTransaction(wr->address() + 1);
         }
 
-        int bytes_written_local = localWrite(wr->address(), wr->offset(), wr->buffer(), dataDirPath);
+        int bytes_written_local = localWrite(wr->address(), wr->offset(), wr->buffer(), dataDirPath,
+                                             inMemoryCacheEnable, inMemoryCachedBlocks);
 
         if (currentRole == "backup") {
             // struct timespec currentTime;
@@ -570,7 +586,6 @@ void backupBlockRead(int address, bool isReadAligned) {
     auto it2 = it1;
     if (!isReadAligned) {
         it2 = backupLastWriteTime.find(address + 1);
-        ;
     }
     struct timespec lastWriteTime, *t1(nullptr), *t2(nullptr), currentTime;
     get_time(&currentTime);
