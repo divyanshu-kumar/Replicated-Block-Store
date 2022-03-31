@@ -2,8 +2,11 @@
 
 int run_application(bool isReadOnlyMode);
 
+vector<vector<pair<double, int>>> allReadTimes, allWriteTimes;
+void printStats();
 
-bool cacheStalenessValidation(const vector<uint32_t> &addressVector) {
+bool cacheStalenessValidation(const vector<uint32_t> &addressVector, 
+    vector<CacheInfo> & cacheMap) {
     for (auto &address : addressVector) {
         if (!cacheMap[address].isCached || cacheMap[address].isStale())
             return false;
@@ -11,8 +14,7 @@ bool cacheStalenessValidation(const vector<uint32_t> &addressVector) {
     return true;
 }
 
-static int client_read(uint32_t offset, string &buf,
-                       bool readFromBackup = false) {
+int Client::client_read(uint32_t offset, string &buf) {
     if (debugMode <= DebugLevel::LevelInfo) {
         cout << __func__ << "\t : Offset = " << offset
              << ", ReadFromBackup = " << readFromBackup << endl;
@@ -31,7 +33,7 @@ static int client_read(uint32_t offset, string &buf,
         readSize = 2 * BLOCK_SIZE_BYTES;
     }
 
-    if (isCachingEnabled && cacheStalenessValidation(addressVector)) {
+    if (isCachingEnabled && cacheStalenessValidation(addressVector, cacheMap)) {
         if (debugMode <= DebugLevel::LevelInfo) {
             cout << __func__ << "\t : Cached data found!" << endl;
         }
@@ -49,11 +51,12 @@ static int client_read(uint32_t offset, string &buf,
 
     if (debugMode <= DebugLevel::LevelInfo) {
         cout << __func__ << "\t : Contacting server "
-             << serverInfos[serverToContactIdx].address << endl;
+             << serverInfos[serverToContactIdx]->address << endl;
     }
 
-    int res = (serverInfos[serverToContactIdx].connection)
-                  ->rpc_read(address, buf, readSize, offset);
+    int res = (serverInfos[serverToContactIdx]->connection)
+                  ->rpc_read(address, buf, readSize, offset, isCachingEnabled, 
+                  clientIdentifier, currentServerIdx);
 
     if (res == SERVER_OFFLINE_ERROR_CODE) {
         if (debugMode <= DebugLevel::LevelInfo) {
@@ -62,11 +65,12 @@ static int client_read(uint32_t offset, string &buf,
                     "server now."
                  << endl;
         }
-        if (!readFromBackup) {
-            switchServerConnection();
-        }
-        res = (serverInfos[currentServerIdx].connection)
-                  ->rpc_read(address, buf, readSize, offset);
+        // if (!readFromBackup) {
+        //     switchServerConnection();
+        // }
+        res = (serverInfos[currentServerIdx]->connection)
+                  ->rpc_read(address, buf, readSize, offset, isCachingEnabled, 
+                  clientIdentifier, currentServerIdx);
         if (res < 0) {
             if (debugMode <= DebugLevel::LevelError) {
                 cout << __func__ << "\t : Both servers are offline!" << endl;
@@ -75,7 +79,7 @@ static int client_read(uint32_t offset, string &buf,
         }
     }
 
-    if (isCachingEnabled) {
+    if (!readFromBackup && isCachingEnabled) {
         if (debugMode <= DebugLevel::LevelInfo) {
             cout << __func__ << "\t : Caching address : " << address;
         }
@@ -95,7 +99,7 @@ static int client_read(uint32_t offset, string &buf,
     return res;
 }
 
-static int client_write(uint32_t offset, const string &buf) {
+int Client::client_write(uint32_t offset, const string &buf) {
     if (debugMode <= DebugLevel::LevelInfo) {
         cout << __func__ << "\t : Offset = " << offset << endl;
     }
@@ -119,8 +123,9 @@ static int client_write(uint32_t offset, const string &buf) {
         }
     }
 
-    int res = (serverInfos[currentServerIdx].connection)
-                  ->rpc_write(address, buf, offset);
+    int res = (serverInfos[currentServerIdx]->connection)
+                  ->rpc_write(address, buf, offset, clientIdentifier, 
+                  currentServerIdx);
 
     if (res == SERVER_OFFLINE_ERROR_CODE) {
         if (debugMode <= DebugLevel::LevelInfo) {
@@ -129,9 +134,10 @@ static int client_write(uint32_t offset, const string &buf) {
                     "server now."
                  << endl;
         }
-        switchServerConnection();
-        res = (serverInfos[currentServerIdx].connection)
-                  ->rpc_write(address, buf, offset);
+        // switchServerConnection();
+        res = (serverInfos[currentServerIdx]->connection)
+                  ->rpc_write(address, buf, offset, clientIdentifier, 
+                  currentServerIdx);
         if (res < 0) {
             if (debugMode <= DebugLevel::LevelError) {
                 cout << __func__ << "\t : Both servers are offline!" << endl;
@@ -142,6 +148,29 @@ static int client_write(uint32_t offset, const string &buf) {
 
     return res;
 }
+
+void cacheInvalidationListener(vector<ServerInfo*> & serverInfos, int currentServerIdx,
+    bool isCachingEnabled, string clientIdentifier, vector<CacheInfo> & cacheMap) {
+    cout << __func__ << "\t : Listening for notifications.." << endl;
+    Status status = grpc::Status::OK;
+    do {
+        status = (serverInfos[currentServerIdx]->connection)
+                     ->rpc_subscribeForNotifications(isCachingEnabled, clientIdentifier, cacheMap);
+        if (debugMode <= DebugLevel::LevelInfo) {
+            cout << __func__ << "\t : Error code = " << status.error_code()
+                 << " and message = " << status.error_message() << endl;
+        }
+        if (status.error_code() == grpc::StatusCode::UNAVAILABLE) {
+            currentServerIdx = (currentServerIdx + 1) % serverInfos.size();
+            if (debugMode <= DebugLevel::LevelError) {
+                cout << __func__ << "\t : Changing to backup server "
+                     << serverInfos[currentServerIdx]->address << endl;
+            }
+        }
+    } while (grpc::StatusCode::UNAVAILABLE == status.error_code());
+    cout << __func__ << "\t : Stopped listening for notifications now." << endl;
+}
+
 
 int main(int argc, char *argv[]) {
     ios::sync_with_stdio(false);
@@ -161,6 +190,7 @@ int main(int argc, char *argv[]) {
     int crashSite = 0;
     string argumentString;
     bool isReadOnlyMode = false;
+    int numClients = 1;
 
     if (argc > 1) {
         for (int arg = 1; arg < argc; arg++) {
@@ -187,24 +217,63 @@ int main(int argc, char *argv[]) {
 
         isReadOnlyMode = !parseArgument(argumentString, "--readOnly=").empty();
         cout << __func__ << "\t : Read Only Mode = " << isReadOnlyMode << endl;
+
+        string clientArg = parseArgument(argumentString, "--numClients=");
+        if (!clientArg.empty()) {
+            int numClientsPassed = stoi(clientArg);
+            if (numClientsPassed > 0 && numClientsPassed < 1000) {
+                numClients = numClientsPassed;
+            }
+        }
     }
 
     if (addresses.empty()) {
         addresses = {"localhost:50051", "localhost:50053"};
     }
+    
+    const bool isCachingEnabled = true;
 
-    clientIdentifier = generateClientIdentifier();
+    cout << "Num Clients = " << numClients << endl;
+    // vector<std::thread> clientThreads(numClients);
 
-    initServerInfo(addresses);
+    // vector<Client*> clientObjs;
+    // for (int i = 0; i < numClients; i++) {
+    //     clientObjs.push_back(new Client(addresses, isCachingEnabled, isReadOnlyMode));
+    //     cout << "Creating the threads!" << endl;
+    //     clientThreads.push_back(std::thread(&Client::run_application, clientObjs[i]));
+    //     cout << "Created thread " << i << endl;
+    // }
+    // cout << "Created the threads!" << endl;
+    // for (int i = 0; i < numClients; i++) {
+    //     clientThreads[i].join();
+    //     //delete clientObjs[i];
+    // }
+    // msleep(20000);
+    vector<Client*> ourClients;
+    for (int i = 0; i < numClients; i++) {
+        allReadTimes.push_back({});
+        allWriteTimes.push_back({});
+        ourClients.push_back(new Client(addresses, isCachingEnabled, isReadOnlyMode));    
+    }
+    vector<thread> threads;
+    for (int i = 0; i < numClients; i++) {
+        threads.push_back(thread(&Client::run_application, ourClients[i], i));
+    }
+    // std::thread clientThread(&Client::run_application, &ourClient);
+    for (int i = 0; i < numClients; i++) {
+        threads[i].join();
+        delete ourClients[i];
+    }
 
-    printf("%s \t: Connecting to server at %s...\n", __func__,
-           serverInfos[currentServerIdx].address.c_str());
-
-    return run_application(isReadOnlyMode);
+    printStats();
+    cout << "Finished with the threads!" << endl;
+    return 0;
 }
 
-int run_application(bool isReadOnlyMode) {
-    vector<pair<double, int>> readTimes, writeTimes;
+int Client::run_application(int threadId) {
+    msleep(2000);
+    vector<pair<double, int>> &readTimes = allReadTimes[threadId], 
+                              &writeTimes = allWriteTimes[threadId];
 
     string write_data = string(4096, 'x');
 
@@ -212,7 +281,7 @@ int run_application(bool isReadOnlyMode) {
 
     std::random_device dev;
     std::mt19937 rng(dev());
-    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 50);
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 200);
 
     const int NUM_RUNS = 50;
 
@@ -224,7 +293,7 @@ int run_application(bool isReadOnlyMode) {
         get_time(&read_start);
 
         int num_bytes_read =
-            client_read(address * BLOCK_SIZE_BYTES, buf, isReadOnlyMode);
+            client_read(address * BLOCK_SIZE_BYTES, buf);
 
         get_time(&read_end);
         readTimes.push_back(
@@ -242,7 +311,7 @@ int run_application(bool isReadOnlyMode) {
         get_time(&read_start);
 
         num_bytes_read =
-            client_read(address * BLOCK_SIZE_BYTES, buf, isReadOnlyMode);
+            client_read(address * BLOCK_SIZE_BYTES, buf);
 
         get_time(&read_end);
         readTimes.push_back(
@@ -263,7 +332,7 @@ int run_application(bool isReadOnlyMode) {
 
         int num_bytes_write = 0;
 
-        if (!isReadOnlyMode)
+        if (!readFromBackup)
             num_bytes_write =
                 client_write(address * BLOCK_SIZE_BYTES, write_data);
 
@@ -271,14 +340,67 @@ int run_application(bool isReadOnlyMode) {
         writeTimes.push_back(
             make_pair(get_time_diff(&write_start, &write_end), address));
 
-        if ((!isReadOnlyMode) && (num_bytes_write != 4096) &&
+        if ((!readFromBackup) && (num_bytes_write != 4096) &&
             (debugMode <= DebugLevel::LevelError)) {
             printf("Didn't write 4k bytes to this file! Instead wrote %d bytes.\n", num_bytes_write);
         }
 
-        msleep((int)dist6(rng));
+        msleep(2 * (int)dist6(rng));
     }
 
+    // double meanReadTime = 0;
+    // for (auto &readTime : readTimes) {
+    //     meanReadTime += readTime.first;
+    // }
+    // meanReadTime /= readTimes.size();
+
+    // double meanWriteTime = 0;
+    // for (auto &writeTime : writeTimes) {
+    //     meanWriteTime += writeTime.first;
+    // }
+    // meanWriteTime /= writeTimes.size();
+
+    // sort(readTimes.begin(), readTimes.end());
+    // sort(writeTimes.begin(), writeTimes.end());
+
+    // double medianReadTime = readTimes[readTimes.size() / 2].first;
+    // double medianWriteTime = writeTimes[writeTimes.size() / 2].first;
+
+    // printf(
+    //     "%s : *****STATS (milliseconds) *****\n"
+    //     "meanRead   = %f \t meanWrite   = %f \n"
+    //     "medianRead = %f \t medianWrite = %f\n"
+    //     "minRead    = %f \t minWrite    = %f\n"
+    //     "minAddress = %d \t minAddress  = %d\n"
+    //     "maxRead    = %f \t maxWrite    = %f\n"
+    //     "maxAddress = %d \t maxAddress  = %d\n",
+    //     __func__, meanReadTime, meanWriteTime, medianReadTime, medianWriteTime,
+    //     readTimes.front().first, writeTimes.front().first,
+    //     readTimes.front().second, writeTimes.front().second,
+    //     readTimes.back().first, writeTimes.back().first,
+    //     readTimes.back().second, writeTimes.back().second);
+
+    (serverInfos[currentServerIdx]->connection)
+        ->rpc_unSubscribeForNotifications(clientIdentifier);
+    notificationThread.join();
+
+    return 0;
+}
+
+void printStats() {
+    vector<pair<double, int>> readTimes, writeTimes;
+    for (auto readTime : allReadTimes) {
+        for (auto p : readTime) {
+            readTimes.push_back(p);
+        }
+    }
+    
+    for (auto writeTime : allWriteTimes) {
+        for (auto p : writeTime) {
+            writeTimes.push_back(p);
+        }
+    }
+    
     double meanReadTime = 0;
     for (auto &readTime : readTimes) {
         meanReadTime += readTime.first;
@@ -310,10 +432,4 @@ int run_application(bool isReadOnlyMode) {
         readTimes.front().second, writeTimes.front().second,
         readTimes.back().first, writeTimes.back().first,
         readTimes.back().second, writeTimes.back().second);
-
-    (serverInfos[currentServerIdx].connection)
-        ->rpc_unSubscribeForNotifications();
-    notificationThread.join();
-
-    return 0;
 }

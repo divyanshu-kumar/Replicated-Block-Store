@@ -14,13 +14,9 @@ const int MAX_NUM_RETRIES = 6;
 const int INITIAL_BACKOFF_MS = 50;
 const int MULTIPLIER = 2;
 
-static string clientIdentifier;
-std::thread notificationThread;
+vector<string> addresses;
 
-static int currentServerIdx = 0;
-
-int switchServerConnection();
-string getServerName(int index);
+// int switchServerConnection();
 
 struct CacheInfo {
     bool isCached;
@@ -32,15 +28,14 @@ struct CacheInfo {
     void invalidateCache() { isCached = false; }
 };
 
-vector<CacheInfo> cacheMap(numBlocks);
-
 class BlockStorageClient {
    public:
     BlockStorageClient(std::shared_ptr<Channel> channel)
         : stub_(BlockStorageService::NewStub(channel)) {}
 
     int rpc_read(uint32_t address, string &buf, uint32_t size,
-                 uint32_t offset) {
+                 uint32_t offset, bool isCachingEnabled, string & clientIdentifier, 
+                 int currentServerIdx) {
         if (debugMode <= DebugLevel::LevelInfo) {
             printf("%s : Address = %d\n", __func__, address);
         }
@@ -84,7 +79,7 @@ class BlockStorageClient {
                 }
                 if (debugMode <= DebugLevel::LevelError) {
                     cout << __func__ << "\t : Retrying to " 
-                         << getServerName(currentServerIdx) << " with timeout (ms) of "
+                         << addresses[currentServerIdx] << " with timeout (ms) of "
                          << currentBackoff << " MULTIPLIER = " << MULTIPLIER << endl;
                 }
             }
@@ -110,7 +105,8 @@ class BlockStorageClient {
         }
     }
 
-    int rpc_write(uint32_t address, const string &buf, uint32_t offset) {
+    int rpc_write(uint32_t address, const string &buf, uint32_t offset, 
+         string & clientIdentifier, int currentServerIdx) {
         if (debugMode <= DebugLevel::LevelInfo) {
             printf("%s : Address = %d\n", __func__, address);
         }
@@ -152,7 +148,7 @@ class BlockStorageClient {
                 }
                 if (debugMode <= DebugLevel::LevelError) {
                     cout << __func__ << "\t : Retrying to " 
-                         << getServerName(currentServerIdx) << " with timeout (ms) of "
+                         << addresses[currentServerIdx] << " with timeout (ms) of "
                          << currentBackoff << endl;
                 }
             }
@@ -176,7 +172,8 @@ class BlockStorageClient {
         }
     }
 
-    Status rpc_subscribeForNotifications() {
+    Status rpc_subscribeForNotifications(bool isCachingEnabled, string & clientIdentifier,
+        vector<CacheInfo> &cacheMap) {
         if (debugMode <= DebugLevel::LevelInfo) {
             cout << __func__ << endl;
         }
@@ -211,7 +208,7 @@ class BlockStorageClient {
         return status;
     }
 
-    void rpc_unSubscribeForNotifications() {
+    void rpc_unSubscribeForNotifications(string & clientIdentifier) {
         if (debugMode <= DebugLevel::LevelInfo) {
             cout << __func__ << endl;
         }
@@ -239,47 +236,24 @@ struct ServerInfo {
     string address;
     BlockStorageClient *connection;
 
-    void init(string address) {
-        this->address = address;
+    ServerInfo(string addr) : address(addr), 
+        connection(new BlockStorageClient(grpc::CreateChannel(
+            address.c_str(), grpc::InsecureChannelCredentials()))) { 
         cout << __func__ << "\t : Initialize connection from client to "
              << address << endl;
-        this->connection = new BlockStorageClient(grpc::CreateChannel(
-            address.c_str(), grpc::InsecureChannelCredentials()));
     }
+    // void init(string address) {
+    //     this->address = address;
+    //     cout << __func__ << "\t : Initialize connection from client to "
+    //          << address << endl;
+    //     this->connection = new BlockStorageClient(grpc::CreateChannel(
+    //         address.c_str(), grpc::InsecureChannelCredentials()));
+    // }
 };
 
-static vector<ServerInfo> serverInfos;
+void cacheInvalidationListener(vector<ServerInfo*> & serverInfos, int currentServerIdx,
+    bool isCachingEnabled, string clientIdentifier, vector<CacheInfo> & cacheMap);
 
-void cacheInvalidationListener() {
-    cout << __func__ << "\t : Listening for notifications.." << endl;
-    Status status = grpc::Status::OK;
-    do {
-        status = (serverInfos[currentServerIdx].connection)
-                     ->rpc_subscribeForNotifications();
-        if (debugMode <= DebugLevel::LevelInfo) {
-            cout << __func__ << "\t : Error code = " << status.error_code()
-                 << " and message = " << status.error_message() << endl;
-        }
-        if (status.error_code() == grpc::StatusCode::UNAVAILABLE) {
-            currentServerIdx = (currentServerIdx + 1) % serverInfos.size();
-            if (debugMode <= DebugLevel::LevelError) {
-                cout << __func__ << "\t : Changing to backup server "
-                     << getServerName(currentServerIdx) << endl;
-            }
-        }
-    } while (grpc::StatusCode::UNAVAILABLE == status.error_code());
-    cout << __func__ << "\t : Stopped listening for notifications now." << endl;
-}
-
-void initServerInfo(vector<string> addresses) {
-    for (string address : addresses) {
-        ServerInfo serverInfo;
-        serverInfo.init(address);
-        serverInfos.push_back(serverInfo);
-    }
-    notificationThread = (std::thread(cacheInvalidationListener));
-    msleep(1);
-}
 
 bool CacheInfo::isStale() {
     struct timespec curTime;
@@ -295,24 +269,61 @@ void CacheInfo::cacheData(const string &data) {
     get_time(&lastRefreshTs);
 }
 
-int switchServerConnection() {
-    cout << __func__ << "\t : Primary server is offline!" << endl;
+// int switchServerConnection() {
+//     cout << __func__ << "\t : Primary server is offline!" << endl;
 
-    // Commenting out as this functionality is being handled by subscription
-    // service now. But discuss it with team - **TODO**.
-    //currentServerIdx = (currentServerIdx + 1) % serverInfos.size();
+//     // Commenting out as this functionality is being handled by subscription
+//     // service now. But discuss it with team - **TODO**.
+//     //currentServerIdx = (currentServerIdx + 1) % serverInfos.size();
 
-    //notificationThread.join();
-    //notificationThread = (std::thread(cacheInvalidationListener));
-    msleep(1);
+//     //notificationThread.join();
+//     //notificationThread = (std::thread(cacheInvalidationListener));
+//     msleep(1);
 
-    cout << __func__ << "\t : Changing to server at "
-         << getServerName(currentServerIdx) << endl;
-}
+//     cout << __func__ << "\t : Changing to server at "
+//          << getServerName(currentServerIdx) << endl;
+// }
 
-string getServerName(int index) {
-    if (index < 0 || index > serverInfos.size()) {
-        return "";
+class Client {
+    public:
+    string clientIdentifier;
+    std::thread notificationThread;
+    int currentServerIdx;
+    vector<ServerInfo*> serverInfos;
+    vector<CacheInfo> cacheMap;
+    bool readFromBackup, isCachingEnabled;
+
+    Client(vector<string> &serverAddresses, bool cachingEnabled, bool isReadFromBackup = false) 
+        : cacheMap(numBlocks) {
+        isCachingEnabled = cachingEnabled;
+        readFromBackup = isReadFromBackup;
+        currentServerIdx = 0;
+        clientIdentifier = generateClientIdentifier();
+        initServerInfo(serverAddresses);
+        printf("%s \t: Connecting to server at %s...\n", __func__,
+           serverInfos[currentServerIdx]->address.c_str());
+        //run_application();
+        cout << __func__ << "\t : Client created with id = " <<  clientIdentifier << endl;
     }
-    return serverInfos[index].address;
-}
+
+    int run_application(int threadId);
+
+    int client_read(uint32_t offset, string &buf);
+    int client_write(uint32_t offset, const string &buf);
+
+    void initServerInfo(vector<string> addresses) {
+        for (string address : addresses) {
+            serverInfos.push_back(new ServerInfo(address));
+        }
+        notificationThread = (std::thread(cacheInvalidationListener, std::ref(serverInfos), currentServerIdx, 
+            isCachingEnabled, clientIdentifier, std::ref(cacheMap)));
+        msleep(1);
+    }
+
+    ~Client() {
+        for (int i = 0; i < serverInfos.size(); i++) {
+            delete serverInfos[i]->connection;
+        }
+    }
+};
+

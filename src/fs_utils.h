@@ -10,8 +10,9 @@ int copyFile(const char *to, const char *from) {
         return -1;
 
     fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL, 0666);
-    if (fd_to < 0)
+    if (fd_to < 0) {
         goto out_error;
+    }
 
     while (nread = read(fd_from, buf, sizeof buf), nread > 0) {
         char *out_ptr = buf;
@@ -19,7 +20,6 @@ int copyFile(const char *to, const char *from) {
 
         do {
             nwritten = write(fd_to, out_ptr, nread);
-
             if (nwritten >= 0) {
                 nread -= nwritten;
                 out_ptr += nwritten;
