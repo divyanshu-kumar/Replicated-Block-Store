@@ -1,3 +1,21 @@
+#include <experimental/filesystem>
+
+// do a force copy of file from source to destination
+int copyFile(const string &to, const string &from){
+    std::experimental::filesystem::path sourceFile = from;
+    std::experimental::filesystem::path target = to;
+
+    try
+    {
+        copy_file(sourceFile, target, std::experimental::filesystem::copy_options::overwrite_existing);
+    }
+    catch (std::exception& e) // Not using fs::filesystem_error since std::bad_alloc can throw too.  
+    {
+        std::cout << e.what() << "Error occured while copying the file " << from << " to destinatoon " << to << endl;
+        return -1;
+    }
+    return 0;
+}
 
 int copyFile(const char *to, const char *from) {
     int fd_to, fd_from;

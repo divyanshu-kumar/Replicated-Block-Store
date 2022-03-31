@@ -487,7 +487,7 @@ int logWriteTransaction(int address) {
     string destPath = writeTxLogsDirPath + "/" + to_string(address);
     string sourcePath = dataDirPath + "/" + to_string(address);
 
-    int res = copyFile(destPath.c_str(), sourcePath.c_str());
+    int res = copyFile(destPath, sourcePath);
     if (res == -1) {
         if (debugMode <= DebugLevel::LevelError) {
             printf("%s\t : Error: Dest Path = %s, Source Path = %s\n", __func__,
