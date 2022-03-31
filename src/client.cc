@@ -234,21 +234,7 @@ int main(int argc, char *argv[]) {
     const bool isCachingEnabled = true;
 
     cout << "Num Clients = " << numClients << endl;
-    // vector<std::thread> clientThreads(numClients);
 
-    // vector<Client*> clientObjs;
-    // for (int i = 0; i < numClients; i++) {
-    //     clientObjs.push_back(new Client(addresses, isCachingEnabled, isReadOnlyMode));
-    //     cout << "Creating the threads!" << endl;
-    //     clientThreads.push_back(std::thread(&Client::run_application, clientObjs[i]));
-    //     cout << "Created thread " << i << endl;
-    // }
-    // cout << "Created the threads!" << endl;
-    // for (int i = 0; i < numClients; i++) {
-    //     clientThreads[i].join();
-    //     //delete clientObjs[i];
-    // }
-    // msleep(20000);
     vector<Client*> ourClients;
     for (int i = 0; i < numClients; i++) {
         allReadTimes.push_back({});
@@ -259,7 +245,6 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < numClients; i++) {
         threads.push_back(thread(&Client::run_application, ourClients[i], i));
     }
-    // std::thread clientThread(&Client::run_application, &ourClient);
     for (int i = 0; i < numClients; i++) {
         threads[i].join();
         delete ourClients[i];
@@ -271,7 +256,6 @@ int main(int argc, char *argv[]) {
 }
 
 int Client::run_application(int threadId) {
-    msleep(2000);
     vector<pair<double, int>> &readTimes = allReadTimes[threadId], 
                               &writeTimes = allWriteTimes[threadId];
 
@@ -283,11 +267,12 @@ int Client::run_application(int threadId) {
     std::mt19937 rng(dev());
     std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 200);
 
+    std::uniform_int_distribution<std::mt19937::result_type> dist7(0, 20000);
     const int NUM_RUNS = 50;
 
     for (int i = 0; i < NUM_RUNS; i++) {
         string buf;
-        uint32_t address = i % NUM_RUNS;  // max(0, rand()) % totalBlocks;
+        uint32_t address = (int)dist7(rng);
 
         struct timespec read_start, read_end;
         get_time(&read_start);
@@ -325,8 +310,6 @@ int Client::run_application(int threadId) {
 
         msleep((int)dist6(rng));
 
-        address = i % NUM_RUNS;  // max(0, rand()) % totalBlocks;
-
         struct timespec write_start, write_end;
         get_time(&write_start);
 
@@ -347,38 +330,6 @@ int Client::run_application(int threadId) {
 
         msleep(2 * (int)dist6(rng));
     }
-
-    // double meanReadTime = 0;
-    // for (auto &readTime : readTimes) {
-    //     meanReadTime += readTime.first;
-    // }
-    // meanReadTime /= readTimes.size();
-
-    // double meanWriteTime = 0;
-    // for (auto &writeTime : writeTimes) {
-    //     meanWriteTime += writeTime.first;
-    // }
-    // meanWriteTime /= writeTimes.size();
-
-    // sort(readTimes.begin(), readTimes.end());
-    // sort(writeTimes.begin(), writeTimes.end());
-
-    // double medianReadTime = readTimes[readTimes.size() / 2].first;
-    // double medianWriteTime = writeTimes[writeTimes.size() / 2].first;
-
-    // printf(
-    //     "%s : *****STATS (milliseconds) *****\n"
-    //     "meanRead   = %f \t meanWrite   = %f \n"
-    //     "medianRead = %f \t medianWrite = %f\n"
-    //     "minRead    = %f \t minWrite    = %f\n"
-    //     "minAddress = %d \t minAddress  = %d\n"
-    //     "maxRead    = %f \t maxWrite    = %f\n"
-    //     "maxAddress = %d \t maxAddress  = %d\n",
-    //     __func__, meanReadTime, meanWriteTime, medianReadTime, medianWriteTime,
-    //     readTimes.front().first, writeTimes.front().first,
-    //     readTimes.front().second, writeTimes.front().second,
-    //     readTimes.back().first, writeTimes.back().first,
-    //     readTimes.back().second, writeTimes.back().second);
 
     (serverInfos[currentServerIdx]->connection)
         ->rpc_unSubscribeForNotifications(clientIdentifier);
