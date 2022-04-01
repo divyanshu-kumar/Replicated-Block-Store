@@ -38,6 +38,7 @@ void    backupBlockRead(int address, bool isReadAligned);
 struct timespec* max_time(struct timespec *t1, struct timespec *t2);
 
 struct BackupOutOfSync {
+    mutex m_lock;
     bool isOutOfSync;
     vector<bool> outOfSyncBlocks;
 
@@ -336,7 +337,7 @@ class ServerReplication final : public BlockStorageService::Service {
                 if (!isAlignedWrite) {
                     backupSyncState.logOutOfSync(wr->address() + 1);
                 }
-                if (isBackupAvailable) {
+                if (isBackupAvailable && backupSyncState.isOutOfSync) {
                     backupSyncState.sync();
                 }
             } else {
@@ -418,7 +419,14 @@ class ServerReplication final : public BlockStorageService::Service {
 
         while (reader->Read(&heartbeatRes)) {
             auto message = heartbeatRes.msg();
-            cout << __func__ << "\t : Heartbeat connection broken." << endl;
+            if (!message.empty() && message == "OK") {
+                cout << __func__ << "\t : Successfully sync'd with backup server!" << endl;
+                backupSyncState.sync();
+                isBackupAvailable = true;
+            }
+            else {
+                cout << __func__ << "\t : Heartbeat connection broken." << endl;
+            }
         }
 
         Status status = reader->Finish();
@@ -436,8 +444,15 @@ class ServerReplication final : public BlockStorageService::Service {
         if (debugMode <= DebugLevel::LevelInfo) {
             cout << __func__ << endl;
         }
+        Heartbeat heartbeatResult;
+        heartbeatResult.set_msg("OK");
+        bool isFirstMsgSent(false);
 
         while (true) {
+            if (!isFirstMsgSent) {
+                writer->Write(heartbeatResult);
+                isFirstMsgSent = true;
+            }
             msleep(500);
         }
 
@@ -451,6 +466,7 @@ class ServerReplication final : public BlockStorageService::Service {
 static ServerReplication* serverReplication;
 
 void BackupOutOfSync::logOutOfSync(const int address) {
+    lock_guard<mutex> guard(m_lock);
     if (debugMode <= DebugLevel::LevelInfo) {
         cout << __func__ << "\t : Out of sync address = " << address << endl;
     }
@@ -459,6 +475,7 @@ void BackupOutOfSync::logOutOfSync(const int address) {
 }
 
 int BackupOutOfSync::sync() {
+    lock_guard<mutex> guard(m_lock);
     if (debugMode <= DebugLevel::LevelInfo) {
         cout << __func__ << endl;
     }
@@ -565,7 +582,6 @@ void runHeartbeat() {
         cout << __func__ << "\t : Starting heartbeat service!" << endl;
     }
     while (heartbeatShouldRun) {
-        isBackupAvailable = true;
         serverReplication->rpc_heartbeatSender();
         isBackupAvailable = false;
         if (role == "backup") {

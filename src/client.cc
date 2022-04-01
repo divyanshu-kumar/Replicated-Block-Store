@@ -157,6 +157,12 @@ void cacheInvalidationListener(vector<ServerInfo*> & serverInfos, int & currentS
                  << " and message = " << status.error_message() << endl;
         }
         if (status.error_code() == grpc::StatusCode::UNAVAILABLE) {
+            for (auto &cachedEntry : cacheMap) {
+                cachedEntry.invalidateCache();
+            }
+            if (debugMode <= DebugLevel::LevelNone) {
+                cout << __func__ << "\t : Invalidated all cached entries as changing server!" << endl;
+            }
             currentServerIdx = (currentServerIdx + 1) % serverInfos.size();
             if (debugMode <= DebugLevel::LevelError) {
                 cout << __func__ << "\t : Changing to backup server "
