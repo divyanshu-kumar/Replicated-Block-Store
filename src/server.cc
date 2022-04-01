@@ -67,6 +67,7 @@ int main(int argc, char** argv) {
 
     heartbeatShouldRun = false;
     heartbeatThread.join();
+    delete serverReplication;
 
     return 0;
 }

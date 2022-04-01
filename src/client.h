@@ -241,6 +241,10 @@ struct ServerInfo {
                  << address << endl;
         }
     }
+
+    ~ServerInfo() {
+        delete connection;
+    }
 };
 
 void cacheInvalidationListener(vector<ServerInfo*> & serverInfos, int & currentServerIdx,

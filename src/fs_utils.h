@@ -134,7 +134,7 @@ int localWrite(const int &address, const int &offset, const string &buffer, cons
         }
         close(fd);
     }
-    free(buf);
+    delete[] buf;
     return BLOCK_SIZE_BYTES;
 }
 

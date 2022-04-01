@@ -267,7 +267,7 @@ class ServerReplication final : public BlockStorageService::Service {
         reply->set_bytesread(res);
         reply->set_buffer(buf);
         reply->set_err(0);
-        free(buf);
+        delete[] buf;
 
         // blockLock[rr->address()].unlock();  TODO
 
