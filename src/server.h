@@ -140,17 +140,12 @@ static NotificationInfo notificationManager;
 class ServerReplication final : public BlockStorageService::Service {
    public:
 
-    unordered_map<int, string> inMemoryCachedBlocks;
-    bool inMemoryCacheEnable = true;
+    ReadCache readCache;
 
-    ServerReplication() {
-        inMemoryCachedBlocks.clear();
-    }
+    ServerReplication() { }
 
     ServerReplication(std::shared_ptr<Channel> channel)
-        : stub_(BlockStorageService::NewStub(channel)) {
-            inMemoryCachedBlocks.clear();
-        }
+        : stub_(BlockStorageService::NewStub(channel)) { }
 
     int rpc_write(uint32_t address, const string& buf, uint32_t offset) {
         if (debugMode <= DebugLevel::LevelInfo) {
@@ -235,9 +230,9 @@ class ServerReplication final : public BlockStorageService::Service {
         for (int idx = 0; idx < rr->size() / BLOCK_SIZE_BYTES; idx++) {
             int blockId = rr->address() + idx;
 
-            if(inMemoryCacheEnable && (inMemoryCachedBlocks.find(blockId) != inMemoryCachedBlocks.end())) {
+            if(readCache.isEnabled() && readCache.isPresent(blockId)) {
                 // load buffer from inMemoryCache and avoid fopen call
-                std::strcpy(buf + (idx * BLOCK_SIZE_BYTES), inMemoryCachedBlocks[blockId].c_str());
+                std::strcpy(buf + (idx * BLOCK_SIZE_BYTES), readCache.getCached(blockId).c_str());
                 res = BLOCK_SIZE_BYTES;
             } else {
                 // not present inMemoryCache, so perform file open and cache it as well
@@ -310,7 +305,7 @@ class ServerReplication final : public BlockStorageService::Service {
         }
 
         int bytes_written_local = localWrite(wr->address(), wr->offset(), wr->buffer(), dataDirPath,
-                                             inMemoryCacheEnable, inMemoryCachedBlocks);
+                                             readCache);
 
         if (currentRole == "backup") {
             // struct timespec currentTime;

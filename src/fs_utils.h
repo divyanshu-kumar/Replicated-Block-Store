@@ -1,5 +1,45 @@
 #include <experimental/filesystem>
 
+class ReadCache {
+    unordered_map<int, string> inMemoryCachedBlocks;
+    bool inMemoryCacheEnable;
+    mutex m_lock;
+    
+    public:
+
+    ReadCache() : inMemoryCacheEnable(true) {}
+
+    bool isCacheEnabled() {
+        return inMemoryCacheEnable;
+    }
+
+    void insert(const string & buffer, const int & address) {
+        m_lock.lock();
+        inMemoryCachedBlocks[address] = buffer;
+        m_lock.unlock();
+    }
+
+    bool isPresent(const int & address) {
+        bool result;
+        m_lock.lock();
+        result = inMemoryCachedBlocks.find(address) != inMemoryCachedBlocks.end();
+        m_lock.unlock();
+        return result;
+    }
+
+    string getCached(const int & address) {
+        string result;
+        m_lock.lock();
+        result = inMemoryCachedBlocks[address];
+        m_lock.unlock();
+        return result;
+    }
+
+    bool isEnabled() {
+        return inMemoryCacheEnable;
+    }
+};
+
 // do a force copy of file from source to destination
 int copyFile(const string &to, const string &from){
     std::experimental::filesystem::path sourceFile = from;
@@ -71,7 +111,7 @@ int copyFile(const char *to, const char *from) {
 }
 
 int localWrite(const int &address, const int &offset, const string &buffer, const string &dataDirPath,
-                bool inMemoryCacheEnable, unordered_map<int, string> &inMemoryCachedBlocks) {
+                ReadCache & readCache) {
     bool isWriteAligned = checkIfOffsetIsAligned(offset);
     string blockAddress = dataDirPath + "/" + to_string(address);
 
@@ -89,7 +129,7 @@ int localWrite(const int &address, const int &offset, const string &buffer, cons
     }
     fsync(fd);
     char* buf = new char[one_kb * 4 + 1];
-    if(inMemoryCacheEnable){
+    if(readCache.isEnabled()){
 
         res = pread(fd, buf, one_kb * 4, 0);
         if(res < 0){
@@ -98,11 +138,11 @@ int localWrite(const int &address, const int &offset, const string &buffer, cons
         }
         buf[one_kb * 4] = '\0';
 
-        if(inMemoryCachedBlocks.find(address) == inMemoryCachedBlocks.end()){
-            inMemoryCachedBlocks.insert({address, std::string(buf)});
+        if(!readCache.isPresent(address)){
+            readCache.insert(std::string(buf), address);
         } else {
             // just change the part of inMemoryCach
-            inMemoryCachedBlocks[address] = std::string(buf);
+            readCache.insert(std::string(buf), address);
         }
     }
     close(fd);
@@ -117,7 +157,7 @@ int localWrite(const int &address, const int &offset, const string &buffer, cons
 
         res = pwrite(fd, buffer.substr((BLOCK_SIZE_BYTES - startIdx)).c_str(), startIdx, 0);
         fsync(fd); 
-        if(inMemoryCacheEnable){
+        if(readCache.isCacheEnabled()){
             int res = pread(fd, buf, one_kb * 4, 0);
             if(res < 0){
                 cout<<__func__ << " : Error while inMemoryCaching, pread for address " << address << " and offset: " << offset << endl;
@@ -125,11 +165,11 @@ int localWrite(const int &address, const int &offset, const string &buffer, cons
             }
             buf[one_kb * 4] = '\0';
 
-            if(inMemoryCachedBlocks.find(address+1) == inMemoryCachedBlocks.end()){
-                inMemoryCachedBlocks.insert({address+1, std::string(buf)});
+            if(!readCache.isPresent(address+1)){
+                readCache.insert(std::string(buf), address+1);
             } else {
                 // just change the part of inMemoryCach
-                inMemoryCachedBlocks[address+1] = std::string(buf);
+                readCache.insert(std::string(buf), address+1);
             }
         }
         close(fd);
