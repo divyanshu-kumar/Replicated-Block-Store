@@ -39,14 +39,18 @@ struct timespec* max_time(struct timespec *t1, struct timespec *t2);
 
 struct BackupOutOfSync {
     mutex m_lock;
-    bool isOutOfSync;
-    vector<bool> outOfSyncBlocks;
+    unordered_set<int> outOfSyncBlocks;
 
-    BackupOutOfSync() : isOutOfSync(false), outOfSyncBlocks(numBlocks, false) {}
+    BackupOutOfSync() {}
 
     void logOutOfSync(const int address);
 
     int sync();
+
+    bool isOutOfSync() {
+        lock_guard<mutex> guard(m_lock);
+        return !outOfSyncBlocks.empty();
+    }
 } backupSyncState;
 
 struct NotificationInfo {
@@ -327,12 +331,12 @@ class ServerReplication final : public BlockStorageService::Service {
         }
 
         if ((bytes_written_local != -1) && (currentRole == "primary")) {
-            if (backupSyncState.isOutOfSync) {
+            if (backupSyncState.isOutOfSync()) {
                 backupSyncState.logOutOfSync(wr->address());
                 if (!isAlignedWrite) {
                     backupSyncState.logOutOfSync(wr->address() + 1);
                 }
-                if (isBackupAvailable && backupSyncState.isOutOfSync) {
+                if (isBackupAvailable && backupSyncState.isOutOfSync()) {
                     backupSyncState.sync();
                 }
             } else {
@@ -465,8 +469,7 @@ void BackupOutOfSync::logOutOfSync(const int address) {
     if (debugMode <= DebugLevel::LevelInfo) {
         cout << __func__ << "\t : Out of sync address = " << address << endl;
     }
-    isOutOfSync = true;
-    outOfSyncBlocks[address] = true;
+    outOfSyncBlocks.insert(address);
 }
 
 int BackupOutOfSync::sync() {
@@ -476,10 +479,7 @@ int BackupOutOfSync::sync() {
     }
     int res = 0;
 
-    for (int blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
-        if (outOfSyncBlocks[blockIdx] == false) {
-            continue;
-        }
+    for (auto blockIdx : outOfSyncBlocks) {
         const int four_kb = 4 * one_kb;
         char buf[four_kb + 1];
         res = localRead(blockIdx, buf, dataDirPath);
@@ -495,15 +495,13 @@ int BackupOutOfSync::sync() {
             }
             return -1;
         }
-
-        outOfSyncBlocks[blockIdx] = false;
     }
+
+    outOfSyncBlocks.clear();
 
     if (debugMode <= DebugLevel::LevelInfo) {
         cout << __func__ << "\t : Successfully sync'd changed files!" << endl;
     }
-
-    isOutOfSync = false;
 
     return 0;
 }

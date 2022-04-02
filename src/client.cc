@@ -1,9 +1,13 @@
+#include <fstream>
+#include <iostream>
+
 #include "client.h"
 
 int run_application(bool isReadOnlyMode);
 void printStats();
 
 vector<vector<pair<double, int>>> allReadTimes, allWriteTimes;
+void saveData(const vector<pair<double, int>> & v, const string & filename);
 
 bool cacheStalenessValidation(const vector<uint32_t> &addressVector, 
     vector<CacheInfo> & cacheMap) {
@@ -86,7 +90,7 @@ int Client::client_read(uint32_t offset, string &buf) {
                 cout << " and " << address + 1;
             }
             cacheMap[address + 1].cacheData(buf.substr(BLOCK_SIZE_BYTES));
-            buf = buf.substr(offset, BLOCK_SIZE_BYTES);
+            buf = buf.substr(offset % BLOCK_SIZE_BYTES, BLOCK_SIZE_BYTES);
         }
         if (debugMode <= DebugLevel::LevelInfo) {
             cout << endl;
@@ -233,7 +237,7 @@ int main(int argc, char *argv[]) {
         addresses = {"localhost:50051", "localhost:50053"};
     }
     
-    const bool isCachingEnabled = true;
+    const bool isCachingEnabled = false;
 
     cout << "Num Clients = " << numClients << endl;
 
@@ -245,7 +249,7 @@ int main(int argc, char *argv[]) {
     }
     vector<thread> threads;
     for (int i = 0; i < numClients; i++) {
-        threads.push_back(thread(&Client::run_application, ourClients[i]));
+        threads.push_back(thread(&Client::run_application, ourClients[i], 100));
     }
     for (int i = 0; i < numClients; i++) {
         threads[i].join();
@@ -257,7 +261,9 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-int Client::run_application() {
+int Client::run_application(int NUM_RUNS = 50) {
+    const bool alignedAddress = true;
+
     vector<pair<double, int>> &readTimes = allReadTimes[clientThreadId],
                               &writeTimes = allWriteTimes[clientThreadId];
 
@@ -267,20 +273,24 @@ int Client::run_application() {
 
     std::random_device dev;
     std::mt19937 rng(dev());
-    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 100);
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 50);
 
     std::uniform_int_distribution<std::mt19937::result_type> dist7(0, (int)((MAX_SIZE_BYTES / BLOCK_SIZE_BYTES) - 1));
-    const int NUM_RUNS = 50;
 
     for (int i = 0; i < NUM_RUNS; i++) {
         string buf;
         uint32_t address = (int)dist7(rng);
 
+        if (alignedAddress) {
+            address = address / BLOCK_SIZE_BYTES;
+        }
+
         struct timespec read_start, read_end;
         get_time(&read_start);
 
         int num_bytes_read =
-            client_read(address * BLOCK_SIZE_BYTES, buf);
+            // client_read(address * BLOCK_SIZE_BYTES, buf);
+            client_read(address, buf);
 
         get_time(&read_end);
         readTimes.push_back(
@@ -298,7 +308,8 @@ int Client::run_application() {
         get_time(&read_start);
 
         num_bytes_read =
-            client_read(address * BLOCK_SIZE_BYTES, buf);
+            // client_read(address * BLOCK_SIZE_BYTES, buf);
+            client_read(address, buf);
 
         get_time(&read_end);
         readTimes.push_back(
@@ -319,7 +330,8 @@ int Client::run_application() {
 
         if (!readFromBackup)
             num_bytes_write =
-                client_write(address * BLOCK_SIZE_BYTES, write_data);
+                // client_write(address * BLOCK_SIZE_BYTES, write_data);
+                client_write(address, write_data);
 
         get_time(&write_end);
         writeTimes.push_back(
@@ -336,14 +348,94 @@ int Client::run_application() {
     return 0;
 }
 
+int Client::run_application_writeOnly(int NUM_RUNS = 50) {
+    vector<pair<double, int>> &writeTimes = allWriteTimes[clientThreadId];
+
+    string write_data = string(4096, 'x');
+
+    int totalBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
+
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 5);
+
+    std::uniform_int_distribution<std::mt19937::result_type> dist7(0, 1000);//(int)((MAX_SIZE_BYTES / BLOCK_SIZE_BYTES) - 1));
+
+    for (int i = 0; i < NUM_RUNS; i++) {
+        string buf;
+        uint32_t address = (int)dist7(rng);
+
+        struct timespec write_start, write_end;
+        get_time(&write_start);
+
+        int num_bytes_write = 0;
+
+        if (!readFromBackup)
+            num_bytes_write =
+                // client_write(address * BLOCK_SIZE_BYTES, write_data);
+                client_write(address, write_data);
+
+        get_time(&write_end);
+        writeTimes.push_back(
+            make_pair(get_time_diff(&write_start, &write_end), address));
+
+        if ((!readFromBackup) && (num_bytes_write != 4096) &&
+            (debugMode <= DebugLevel::LevelError)) {
+            printf("Didn't write 4k bytes to this file! Instead wrote %d bytes.\n", num_bytes_write);
+        }
+        msleep((int)dist6(rng));
+    }
+
+    return 0;
+}
+
+int Client::run_application_readOnly(int NUM_RUNS = 50) {
+    vector<pair<double, int>> &readTimes = allReadTimes[clientThreadId];
+
+    int totalBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
+
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 25);
+
+    std::uniform_int_distribution<std::mt19937::result_type> dist7(0, 1000);//(int)((MAX_SIZE_BYTES / BLOCK_SIZE_BYTES) - 1));
+
+    for (int i = 0; i < NUM_RUNS; i++) {
+        if (i % 100 == 0) {
+            cout << __func__ << "\t : run = " << i << endl;
+        }
+        string buf;
+        uint32_t address = (int)dist7(rng);
+
+        struct timespec read_start, read_end;
+        get_time(&read_start);
+
+        int num_bytes_read =
+            // client_read(address * BLOCK_SIZE_BYTES, buf);
+            client_read(address, buf);
+
+        get_time(&read_end);
+        readTimes.push_back(
+            make_pair(get_time_diff(&read_start, &read_end), address));
+
+        if ((num_bytes_read != 4096) && (debugMode <= DebugLevel::LevelError)) {
+            printf(
+                "Didn't read 4k bytes from this file! Instead read %d bytes!\n",
+                num_bytes_read);
+        }
+        msleep((int)dist6(rng));
+    }
+
+    return 0;
+}
 void printPercentileTimes(const vector<pair<double, int>> &readTimes, const vector<pair<double, int>> &writeTimes){
-    cout << "----------------------------------" << endl;
-    cout<<"Percentile \t Read(ms) \t Write(ms)" << endl;
+    cout<<"Percentile,Read(ms),Write(ms)" << endl;
     vector<int> percentiles = {10,20,30,40,50,60,70,80,90,95,96,97,98,99,100};
     for(int percentile : percentiles) {
         int readItr = ((readTimes.size()-1) * percentile)/100, writeItr = ((writeTimes.size()-1) * percentile)/100;
-        double readTime = readTimes[readItr].first , writeTime = writeTimes[writeItr].first;
-        printf("%d \t \t %f \t %f \n", percentile, readTime, writeTime);
+        double readTime = !readTimes.empty() ? readTimes[readItr].first : 0, 
+               writeTime = !writeTimes.empty() ? writeTimes[writeItr].first : 0;
+        printf("%d,%f,%f\n", percentile, readTime, writeTime);
     }
 }
 
@@ -365,33 +457,64 @@ void printStats() {
     for (auto &readTime : readTimes) {
         meanReadTime += readTime.first;
     }
-    meanReadTime /= readTimes.size();
+    if (!readTimes.empty())
+        meanReadTime /= readTimes.size();
 
     double meanWriteTime = 0;
     for (auto &writeTime : writeTimes) {
         meanWriteTime += writeTime.first;
     }
-    meanWriteTime /= writeTimes.size();
+    if (!writeTimes.empty())
+        meanWriteTime /= writeTimes.size();
+
+    auto originalReadTimes = readTimes;
+    auto originalWriteTimes = writeTimes;
 
     sort(readTimes.begin(), readTimes.end());
     sort(writeTimes.begin(), writeTimes.end());
 
-    double medianReadTime = readTimes[readTimes.size() / 2].first;
-    double medianWriteTime = writeTimes[writeTimes.size() / 2].first;
+    double medianReadTime = !readTimes.empty() ? readTimes[readTimes.size() / 2].first : 0;
+    double medianWriteTime = !writeTimes.empty() ? writeTimes[writeTimes.size() / 2].first : 0;
+
+    // printf(
+    //     "%s : *****STATS (milliseconds) *****\n"
+    //     "meanRead   = %f \t meanWrite   = %f \n"
+    //     "medianRead = %f \t medianWrite = %f\n"
+    //     "minRead    = %f \t minWrite    = %f\n"
+    //     "minAddress = %d \t minAddress  = %d\n"
+    //     "maxRead    = %f \t maxWrite    = %f\n"
+    //     "maxAddress = %d \t maxAddress  = %d\n",
+    //     __func__, meanReadTime, meanWriteTime, medianReadTime, medianWriteTime,
+    //     readTimes.front().first, writeTimes.front().first,
+    //     readTimes.front().second, writeTimes.front().second,
+    //     readTimes.back().first, writeTimes.back().first,
+    //     readTimes.back().second, writeTimes.back().second);
 
     printf(
-        "%s : *****STATS (milliseconds) *****\n"
-        "meanRead   = %f \t meanWrite   = %f \n"
-        "medianRead = %f \t medianWrite = %f\n"
-        "minRead    = %f \t minWrite    = %f\n"
-        "minAddress = %d \t minAddress  = %d\n"
-        "maxRead    = %f \t maxWrite    = %f\n"
-        "maxAddress = %d \t maxAddress  = %d\n",
-        __func__, meanReadTime, meanWriteTime, medianReadTime, medianWriteTime,
-        readTimes.front().first, writeTimes.front().first,
-        readTimes.front().second, writeTimes.front().second,
-        readTimes.back().first, writeTimes.back().first,
-        readTimes.back().second, writeTimes.back().second);
+        "meanRead,medianRead,minRead,maxRead\n"
+        "%f,%f,%f,%f\n"
+        "meanWrite,medianWrite,minWrite,maxWrite\n"
+        "%f,%f,%f,%f\n",
+        meanReadTime, medianReadTime, !readTimes.empty() ? readTimes.front().first : 0, !readTimes.empty() ? readTimes.back().first : 0,
+        meanWriteTime, medianWriteTime, !writeTimes.empty() ? writeTimes.front().first : 0, !writeTimes.empty() ? writeTimes.back().first : 0);
 
     printPercentileTimes(readTimes, writeTimes);
+
+    if (!readTimes.empty()) 
+        saveData(originalReadTimes, "readTimes.txt");
+
+    if (!writeTimes.empty())
+        saveData(originalWriteTimes, "writeTimes.txt");
+}
+
+void saveData(const vector<pair<double, int>> & v, const string & filename) {
+    ofstream outfile;
+    outfile.open(filename, ios::trunc);
+
+    for (auto p : v) {
+        outfile << p.first << endl;
+    }
+    // std::copy(v.begin(), v.end(), std::ostream_iterator<std::string>(std::ofstream, "\n"));
+
+    outfile.close();
 }

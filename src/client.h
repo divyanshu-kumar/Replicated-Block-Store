@@ -10,8 +10,8 @@ using grpc::Status;
 using namespace BlockStorage;
 using namespace std;
 
-const int MAX_NUM_RETRIES = 10;
-const int INITIAL_BACKOFF_MS = 50;
+const int MAX_NUM_RETRIES = 8;
+const int INITIAL_BACKOFF_MS = 20;
 const int MULTIPLIER = 2;
 
 struct CacheInfo {
@@ -289,7 +289,9 @@ class Client {
              << " created with id = " <<  clientIdentifier << endl;
     }
 
-    int run_application();
+    int run_application(int NUM_RUNS);
+    int run_application_readOnly(int NUM_RUNS);
+    int run_application_writeOnly(int NUM_RUNS);
 
     int client_read(uint32_t offset, string &buf);
     int client_write(uint32_t offset, const string &buf);

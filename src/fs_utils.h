@@ -7,7 +7,7 @@ class ReadCache {
     
     public:
 
-    ReadCache() : inMemoryCacheEnable(true) {}
+    ReadCache() : inMemoryCacheEnable(false) {}
 
     bool isCacheEnabled() {
         return inMemoryCacheEnable;
@@ -150,7 +150,7 @@ int localWrite(const int &address, const int &offset, const string &buffer, cons
     if (!isWriteAligned) {
         blockAddress = dataDirPath + "/" + to_string(address+1);
 
-        fd = open(blockAddress.c_str(), O_WRONLY);
+        fd = open(blockAddress.c_str(), O_RDWR);
         if (fd == -1) {
             return fd;
         }
@@ -160,6 +160,7 @@ int localWrite(const int &address, const int &offset, const string &buffer, cons
         if(readCache.isCacheEnabled()){
             int res = pread(fd, buf, one_kb * 4, 0);
             if(res < 0){
+                close(fd);
                 cout<<__func__ << " : Error while inMemoryCaching, pread for address " << address << " and offset: " << offset << endl;
                 return -1;  // TODO: check if this is needed
             }
