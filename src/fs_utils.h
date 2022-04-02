@@ -7,7 +7,7 @@ class ReadCache {
     
     public:
 
-    ReadCache() : inMemoryCacheEnable(false) {}
+    ReadCache() : inMemoryCacheEnable(true) {}
 
     bool isCacheEnabled() {
         return inMemoryCacheEnable;
@@ -115,6 +115,10 @@ int localWrite(const int &address, const int &offset, const string &buffer, cons
     bool isWriteAligned = checkIfOffsetIsAligned(offset);
     string blockAddress = dataDirPath + "/" + to_string(address);
 
+    if (debugMode <= DebugLevel::LevelInfo) {
+        cout << __func__ << "\t : Opening file " << blockAddress << endl;
+    }
+
     int fd = open(blockAddress.c_str(), O_RDWR);
     if (fd == -1) {
         return fd;
@@ -149,6 +153,10 @@ int localWrite(const int &address, const int &offset, const string &buffer, cons
     
     if (!isWriteAligned) {
         blockAddress = dataDirPath + "/" + to_string(address+1);
+
+        if (debugMode <= DebugLevel::LevelInfo) {
+            cout << __func__ << "\t : Opening file " << blockAddress << endl;
+        }
 
         fd = open(blockAddress.c_str(), O_RDWR);
         if (fd == -1) {

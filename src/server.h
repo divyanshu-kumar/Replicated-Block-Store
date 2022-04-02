@@ -241,6 +241,11 @@ class ServerReplication final : public BlockStorageService::Service {
             } else {
                 // not present inMemoryCache, so perform file open and cache it as well
                 string blockAddress = dataDirPath + "/" + to_string(blockId);
+
+                if (debugMode <= DebugLevel::LevelInfo) {
+                    cout << __func__ << "\t : Opening file " << blockAddress << endl;
+                }
+
                 int fd = open(blockAddress.c_str(), O_RDONLY);
 
                 if (fd == -1) {

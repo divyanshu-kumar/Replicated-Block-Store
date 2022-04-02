@@ -236,8 +236,8 @@ int main(int argc, char *argv[]) {
     if (addresses.empty()) {
         addresses = {"localhost:50051", "localhost:50053"};
     }
-    
-    const bool isCachingEnabled = false;
+
+    const bool isCachingEnabled = true;
 
     cout << "Num Clients = " << numClients << endl;
 
@@ -249,7 +249,7 @@ int main(int argc, char *argv[]) {
     }
     vector<thread> threads;
     for (int i = 0; i < numClients; i++) {
-        threads.push_back(thread(&Client::run_application, ourClients[i], 100));
+        threads.push_back(thread(&Client::run_application, ourClients[i], 50));
     }
     for (int i = 0; i < numClients; i++) {
         threads[i].join();
@@ -273,9 +273,13 @@ int Client::run_application(int NUM_RUNS = 50) {
 
     std::random_device dev;
     std::mt19937 rng(dev());
-    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 50);
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 100);
 
-    std::uniform_int_distribution<std::mt19937::result_type> dist7(0, (int)((MAX_SIZE_BYTES / BLOCK_SIZE_BYTES) - 1));
+    int maxAddressRange =   (alignedAddress) ?
+                            (int)((MAX_SIZE_BYTES / BLOCK_SIZE_BYTES) - 1) :
+                            (MAX_SIZE_BYTES - BLOCK_SIZE_BYTES);
+
+    std::uniform_int_distribution<std::mt19937::result_type> dist7(0, maxAddressRange);
 
     for (int i = 0; i < NUM_RUNS; i++) {
         string buf;
