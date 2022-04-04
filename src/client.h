@@ -132,7 +132,7 @@ class BlockStorageClient {
             Status status = stub_->rpc_write(&ctx, wreq, &wres);
             error_code = status.error_code();
             currentBackoff *= MULTIPLIER;
-            cout << __func__ << "\t : Status = " << status.error_message() << endl;
+
             if (status.error_code() == grpc::StatusCode::OK ||
                 numRetriesLeft-- == 0) {
                 isDone = true;
