@@ -31,6 +31,7 @@ int main(int argc, char** argv) {
         role = parseArgument(argumentString, "--role=");
         my_address = parseArgument(argumentString, "--my_address=");
         other_address = parseArgument(argumentString, "--other_address=");
+        crashTestingEnabled = parseArgument(argumentString, "--crash=") == "true" ? true : false;
 
         if (!isRoleValid(role) || !isIPValid(my_address) || !isIPValid(other_address)) {
             cout << "Role = " << role << "\nMy Address = " << my_address << 

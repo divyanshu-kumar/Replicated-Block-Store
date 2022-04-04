@@ -63,7 +63,7 @@ class BlockStorageClient {
             error_code = status.error_code();
             currentBackoff *= MULTIPLIER;
 
-            if (status.error_code() != grpc::StatusCode::DEADLINE_EXCEEDED ||
+            if (status.error_code() == grpc::StatusCode::OK ||
                 numRetriesLeft-- == 0) {
                 isDone = true;
             } else {
@@ -82,7 +82,7 @@ class BlockStorageClient {
         }
 
         // case where server is not responding/offline
-        if (error_code == grpc::StatusCode::DEADLINE_EXCEEDED) {
+        if (error_code != grpc::StatusCode::OK) {
             if (debugMode <= DebugLevel::LevelError) {
                 cout << __func__ << "\t : Failed because of timeout!" << endl;
             }
@@ -132,7 +132,8 @@ class BlockStorageClient {
             Status status = stub_->rpc_write(&ctx, wreq, &wres);
             error_code = status.error_code();
             currentBackoff *= MULTIPLIER;
-            if (status.error_code() != grpc::StatusCode::DEADLINE_EXCEEDED ||
+            cout << __func__ << "\t : Status = " << status.error_message() << endl;
+            if (status.error_code() == grpc::StatusCode::OK ||
                 numRetriesLeft-- == 0) {
                 isDone = true;
             } else {
@@ -150,7 +151,7 @@ class BlockStorageClient {
             }
         }
 
-        if (error_code == grpc::StatusCode::DEADLINE_EXCEEDED) {
+        if (error_code != grpc::StatusCode::OK) {
             if (debugMode <= DebugLevel::LevelError) {
                 cout << __func__ << "\t : Failed because of timeout!" << endl;
             }
@@ -290,8 +291,10 @@ class Client {
     }
 
     int run_application(int NUM_RUNS);
+    int run_application_cachedTesting(int NUM_RUNS);
     int run_application_readOnly(int NUM_RUNS);
     int run_application_writeOnly(int NUM_RUNS);
+    int run_application_crashTesting(int NUM_RUNS);
 
     int client_read(uint32_t offset, string &buf);
     int client_write(uint32_t offset, const string &buf);

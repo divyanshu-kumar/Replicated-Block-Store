@@ -3,8 +3,11 @@
 
 #include "client.h"
 
+bool crashTestingEnabled(false);
+
 int run_application(bool isReadOnlyMode);
 void printStats();
+void getRandomText(string &str, int size);
 
 vector<vector<pair<double, int>>> allReadTimes, allWriteTimes;
 void saveData(const vector<pair<double, int>> & v, const string & filename);
@@ -63,15 +66,15 @@ int Client::client_read(uint32_t offset, string &buf) {
                   clientIdentifier, currentServerIdx);
 
     if (res == SERVER_OFFLINE_ERROR_CODE) {
-        if (debugMode <= DebugLevel::LevelInfo) {
+        if (debugMode <= DebugLevel::LevelError) {
             cout << __func__
-                 << "\t : Read request timed-out, trying to contact other "
+                << "\t : Read request timed-out, trying to contact other "
                     "server now."
-                 << endl;
+                << endl;
         }
         res = (serverInfos[currentServerIdx]->connection)
-                  ->rpc_read(address, buf, readSize, offset, isCachingEnabled, 
-                  clientIdentifier, currentServerIdx);
+                ->rpc_read(address, buf, readSize, offset, isCachingEnabled, 
+                clientIdentifier, currentServerIdx);
         if (res < 0) {
             if (debugMode <= DebugLevel::LevelError) {
                 cout << __func__ << "\t : Both servers are offline!" << endl;
@@ -129,15 +132,15 @@ int Client::client_write(uint32_t offset, const string &buf) {
                   currentServerIdx);
 
     if (res == SERVER_OFFLINE_ERROR_CODE) {
-        if (debugMode <= DebugLevel::LevelInfo) {
+        if (debugMode <= DebugLevel::LevelError) {
             cout << __func__
-                 << "\t : Write request timed-out, trying to contact other "
+                << "\t : Write request timed-out, trying to contact other "
                     "server now."
-                 << endl;
+                << endl;
         }
         res = (serverInfos[currentServerIdx]->connection)
-                  ->rpc_write(address, buf, offset, clientIdentifier, 
-                  currentServerIdx);
+                ->rpc_write(address, buf, offset, clientIdentifier, 
+                currentServerIdx);
         if (res < 0) {
             if (debugMode <= DebugLevel::LevelError) {
                 cout << __func__ << "\t : Both servers are offline!" << endl;
@@ -231,6 +234,8 @@ int main(int argc, char *argv[]) {
                 numClients = numClientsPassed;
             }
         }
+
+        crashTestingEnabled = parseArgument(argumentString, "--crash=") == "true" ? true : false;
     }
 
     if (addresses.empty()) {
@@ -249,7 +254,12 @@ int main(int argc, char *argv[]) {
     }
     vector<thread> threads;
     for (int i = 0; i < numClients; i++) {
-        threads.push_back(thread(&Client::run_application, ourClients[i], 50));
+        if (crashTestingEnabled) {
+            threads.push_back(thread(&Client::run_application_crashTesting, ourClients[i], 20));
+        }
+        else {
+            threads.push_back(thread(&Client::run_application_cachedTesting, ourClients[i], 50));
+        }
     }
     for (int i = 0; i < numClients; i++) {
         threads[i].join();
@@ -288,7 +298,7 @@ int Client::run_application(int NUM_RUNS = 50) {
         if (alignedAddress) {
             address = address / BLOCK_SIZE_BYTES;
         }
-
+        
         struct timespec read_start, read_end;
         get_time(&read_start);
 
@@ -335,6 +345,193 @@ int Client::run_application(int NUM_RUNS = 50) {
         if (!readFromBackup)
             num_bytes_write =
                 // client_write(address * BLOCK_SIZE_BYTES, write_data);
+                client_write(address, write_data);
+
+        get_time(&write_end);
+        writeTimes.push_back(
+            make_pair(get_time_diff(&write_start, &write_end), address));
+
+        if ((!readFromBackup) && (num_bytes_write != 4096) &&
+            (debugMode <= DebugLevel::LevelError)) {
+            printf("Didn't write 4k bytes to this file! Instead wrote %d bytes.\n", num_bytes_write);
+        }
+
+        msleep((int)dist6(rng));
+    }
+
+    return 0;
+}
+
+int Client::run_application_crashTesting(int NUM_RUNS = 50) {
+    const bool alignedAddress = true;
+
+    vector<pair<double, int>> &readTimes = allReadTimes[clientThreadId],
+                              &writeTimes = allWriteTimes[clientThreadId];
+
+    string write_data;
+
+    int totalBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
+
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 100);
+
+    int maxAddressRange =   (alignedAddress) ?
+                            (int)((MAX_SIZE_BYTES / BLOCK_SIZE_BYTES) - 1) :
+                            (MAX_SIZE_BYTES - BLOCK_SIZE_BYTES);
+
+    std::uniform_int_distribution<std::mt19937::result_type> dist7(0, maxAddressRange);
+
+    for (int i = 0; i < NUM_RUNS; i++) {
+        if (i == 5) {
+            cout << "RUN = " << i << " (Crash test)" << endl;
+        }
+        else {
+            cout << "RUN = " << i << endl;
+        }
+        string buf;
+        uint32_t address = i * BLOCK_SIZE_BYTES;
+
+        // if (alignedAddress) {
+        //     address = address / BLOCK_SIZE_BYTES;
+        // }
+        
+        struct timespec read_start, read_end;
+        get_time(&read_start);
+
+        int num_bytes_read =
+            // client_read(address * BLOCK_SIZE_BYTES, buf);
+            client_read(address, buf);
+
+        get_time(&read_end);
+        readTimes.push_back(
+            make_pair(get_time_diff(&read_start, &read_end), address));
+
+        if ((num_bytes_read != 4096) && (debugMode <= DebugLevel::LevelError)) {
+            printf(
+                "Didn't read 4k bytes from this file! Instead read %d bytes!\n",
+                num_bytes_read);
+        }
+        else {
+            // cout << __func__ << "\t : Read done at address " << address << endl;
+            cout << __func__ << "\t : BEFORE write at address " << address << ", First 10 chars of data read = " << buf.substr(0, 10) << endl;
+        }
+
+        getRandomText(write_data, BLOCK_SIZE_BYTES);
+
+        cout << __func__ << "\t : WRITING at address " << address << ", First 10 chars of data = " << write_data.substr(0, 10) << endl;
+
+        msleep(1000);
+
+        struct timespec write_start, write_end;
+        get_time(&write_start);
+
+        int num_bytes_write = 0;
+
+        if (!readFromBackup)
+            num_bytes_write =
+                // client_write(address * BLOCK_SIZE_BYTES, write_data);
+                client_write(address, write_data);
+
+        get_time(&write_end);
+        writeTimes.push_back(
+            make_pair(get_time_diff(&write_start, &write_end), address));
+
+        if ((!readFromBackup) && (num_bytes_write != 4096) &&
+            (debugMode <= DebugLevel::LevelError)) {
+            printf("Didn't write 4k bytes to this file! Instead wrote %d bytes.\n", num_bytes_write);
+        }
+        else {
+            // cout << __func__ << "\t : Write done at address " << address << endl;
+        }
+
+        msleep(1000);
+
+        // cout << __func__ << "\t : Now reading the same address = " << address << endl;
+        // Testing cache
+        get_time(&read_start);
+
+        num_bytes_read =
+            // client_read(address * BLOCK_SIZE_BYTES, buf);
+            client_read(address, buf);
+
+        get_time(&read_end);
+        readTimes.push_back(
+            make_pair(get_time_diff(&read_start, &read_end), address));
+
+        if ((num_bytes_read != 4096) && (debugMode <= DebugLevel::LevelError)) {
+            printf(
+                "Didn't read 4k bytes from this file! Instead read %d bytes!\n",
+                num_bytes_read);
+        }
+        else {
+            // cout << __func__ << "\t : Read done at address " << address << endl;
+            cout << __func__ << "\t : AFTER write at address " << address << ", First 10 chars of data read = " << buf.substr(0, 10) << endl;
+        }
+
+        msleep(1000);
+        cout << endl;
+    }
+
+    return 0;
+}
+
+
+int Client::run_application_cachedTesting(int NUM_RUNS = 50) {
+    const bool alignedAddress = true;
+
+    vector<pair<double, int>> &readTimes = allReadTimes[clientThreadId],
+                              &writeTimes = allWriteTimes[clientThreadId];
+
+    string write_data = string(4096, 'x');
+
+    int totalBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
+
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 10);
+
+    int maxAddressRange =   (alignedAddress) ?
+                            (int)((MAX_SIZE_BYTES / BLOCK_SIZE_BYTES) - 1) :
+                            (MAX_SIZE_BYTES - BLOCK_SIZE_BYTES);
+
+    std::uniform_int_distribution<std::mt19937::result_type> dist7(0, maxAddressRange);
+
+    for (int i = 0; i < NUM_RUNS; i++) {
+        string buf;
+        uint32_t address = (int)dist7(rng);
+
+        if (alignedAddress) {
+            address = address / BLOCK_SIZE_BYTES;
+        }
+        for (int readRun = 0; readRun < 10; readRun++) {
+            struct timespec read_start, read_end;
+            get_time(&read_start);
+
+            int num_bytes_read =
+                // client_read(address * BLOCK_SIZE_BYTES, buf);
+                client_read(address, buf);
+
+            get_time(&read_end);
+            readTimes.push_back(
+                make_pair(get_time_diff(&read_start, &read_end), address));
+
+            if ((num_bytes_read != 4096) && (debugMode <= DebugLevel::LevelError)) {
+                printf(
+                    "Didn't read 4k bytes from this file! Instead read %d bytes!\n",
+                    num_bytes_read);
+            }
+
+            msleep((int)dist6(rng));
+        }
+
+        struct timespec write_start, write_end;
+        get_time(&write_start);
+
+        int num_bytes_write = 0;
+
+        if (!readFromBackup)
+            num_bytes_write =
                 client_write(address, write_data);
 
         get_time(&write_end);
@@ -521,4 +718,11 @@ void saveData(const vector<pair<double, int>> & v, const string & filename) {
     // std::copy(v.begin(), v.end(), std::ostream_iterator<std::string>(std::ofstream, "\n"));
 
     outfile.close();
+}
+
+void getRandomText(string &str, int size = 4096) {
+    str.clear();
+    int num_bytes_written = 0;
+    for (int i = 0; i < size; i++)
+        str.push_back((rand() % 26) + 'a');
 }

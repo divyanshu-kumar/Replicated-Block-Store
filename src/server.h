@@ -30,6 +30,7 @@ unordered_map<int, struct timespec> backupLastWriteTime;
 thread heartbeatThread;
 bool heartbeatShouldRun;
 bool isBackupAvailable;
+bool crashTestingEnabled(false);
 
 void    rollbackUncommittedWrites();
 int     logWriteTransaction(int address);
@@ -302,6 +303,11 @@ class ServerReplication final : public BlockStorageService::Service {
         }
 
         if (currentRole == "primary") {
+            if (crashTestingEnabled) {
+                if (wr->address() == 5) {
+                    raise(SIGSEGV);
+                }
+            }
             notificationManager.Notify(wr->address(), wr->identifier());
             if (!isAlignedWrite) {
                 notificationManager.Notify(wr->address() + 1, wr->identifier());
