@@ -17,8 +17,9 @@ using grpc::Status;
 using grpc::StatusCode;
 using namespace BlockStorage;
 using namespace std;
+
 const int MAX_NUM_RETRIES = 5;
-const int INITIAL_BACKOFF_MS = 10;
+const int INITIAL_BACKOFF_MS = 100;
 const int MULTIPLIER = 2;
 string currentWorkDir, dataDirPath, writeTxLogsDirPath;
 
@@ -430,7 +431,7 @@ class ServerReplication final : public BlockStorageService::Service {
         while (reader->Read(&heartbeatRes)) {
             auto message = heartbeatRes.msg();
             if (!message.empty() && message == "OK") {
-                cout << __func__ << "\t : Successfully sync'd with backup server!" << endl;
+                cout << __func__ << "\t : Starting to sync with backup server!" << endl;
                 backupSyncState.sync();
                 isBackupAvailable = true;
             }
@@ -497,7 +498,7 @@ int BackupOutOfSync::sync() {
         if (res == -1) {
             return -1;
         }
-
+        cout << __func__ << "\t : Writing block " << blockIdx << " to backup server" << endl;
         res = serverReplication->rpc_write(blockIdx, buf, 0);
         if (res < 0) {
             if (debugMode <= DebugLevel::LevelInfo) {
@@ -510,7 +511,7 @@ int BackupOutOfSync::sync() {
 
     outOfSyncBlocks.clear();
 
-    if (debugMode <= DebugLevel::LevelInfo) {
+    if (debugMode <= DebugLevel::LevelError) {
         cout << __func__ << "\t : Successfully sync'd changed files!" << endl;
     }
 

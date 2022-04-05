@@ -255,7 +255,7 @@ int main(int argc, char *argv[]) {
     vector<thread> threads;
     for (int i = 0; i < numClients; i++) {
         if (crashTestingEnabled) {
-            threads.push_back(thread(&Client::run_application_crashTesting, ourClients[i], 20));
+            threads.push_back(thread(&Client::run_application_crashTesting, ourClients[i], 10));
         }
         else {
             threads.push_back(thread(&Client::run_application_cachedTesting, ourClients[i], 50));
@@ -489,11 +489,9 @@ int Client::run_application_cachedTesting(int NUM_RUNS = 50) {
 
     std::random_device dev;
     std::mt19937 rng(dev());
-    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 10);
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 50);
 
-    int maxAddressRange =   (alignedAddress) ?
-                            (int)((MAX_SIZE_BYTES / BLOCK_SIZE_BYTES) - 1) :
-                            (MAX_SIZE_BYTES - BLOCK_SIZE_BYTES);
+    int maxAddressRange = (MAX_SIZE_BYTES - BLOCK_SIZE_BYTES);
 
     std::uniform_int_distribution<std::mt19937::result_type> dist7(0, maxAddressRange);
 
@@ -502,7 +500,7 @@ int Client::run_application_cachedTesting(int NUM_RUNS = 50) {
         uint32_t address = (int)dist7(rng);
 
         if (alignedAddress) {
-            address = address / BLOCK_SIZE_BYTES;
+            address = (address / BLOCK_SIZE_BYTES) * BLOCK_SIZE_BYTES;
         }
         for (int readRun = 0; readRun < 10; readRun++) {
             struct timespec read_start, read_end;
@@ -522,7 +520,7 @@ int Client::run_application_cachedTesting(int NUM_RUNS = 50) {
                     num_bytes_read);
             }
 
-            msleep((int)dist6(rng));
+            msleep((int)dist6(rng) % 10);
         }
 
         struct timespec write_start, write_end;

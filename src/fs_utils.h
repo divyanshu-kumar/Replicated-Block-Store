@@ -7,7 +7,7 @@ class ReadCache {
     
     public:
 
-    ReadCache() : inMemoryCacheEnable(true) {}
+    ReadCache() : inMemoryCacheEnable(false) {}
 
     bool isCacheEnabled() {
         return inMemoryCacheEnable;
@@ -131,7 +131,7 @@ int localWrite(const int &address, const int &offset, const string &buffer, cons
         close(fd);
         return -1;
     }
-    fsync(fd);
+    // fsync(fd);
     char* buf = new char[one_kb * 4 + 1];
     if(readCache.isEnabled()){
 
@@ -164,7 +164,7 @@ int localWrite(const int &address, const int &offset, const string &buffer, cons
         }
 
         res = pwrite(fd, buffer.substr((BLOCK_SIZE_BYTES - startIdx)).c_str(), startIdx, 0);
-        fsync(fd); 
+        // fsync(fd); 
         if(readCache.isCacheEnabled()){
             int res = pread(fd, buf, one_kb * 4, 0);
             if(res < 0){

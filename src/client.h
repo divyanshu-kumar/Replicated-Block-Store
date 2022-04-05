@@ -10,8 +10,8 @@ using grpc::Status;
 using namespace BlockStorage;
 using namespace std;
 
-const int MAX_NUM_RETRIES = 8;
-const int INITIAL_BACKOFF_MS = 20;
+const int MAX_NUM_RETRIES = 5;
+const int INITIAL_BACKOFF_MS = 200;
 const int MULTIPLIER = 2;
 
 struct CacheInfo {
