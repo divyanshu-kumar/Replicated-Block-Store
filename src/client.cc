@@ -198,7 +198,7 @@ int main(int argc, char *argv[]) {
     bool isCrashSiteArgPassed = false;
     int crashSite = 0;
     string argumentString;
-    bool isReadOnlyMode = false;
+    bool isReadFromBackup = false;
     int numClients = 1;
 
     if (argc > 1) {
@@ -224,8 +224,8 @@ int main(int argc, char *argv[]) {
             }
         } while (!address.empty());
 
-        isReadOnlyMode = !parseArgument(argumentString, "--readOnly=").empty();
-        cout << __func__ << "\t : Read Only Mode = " << isReadOnlyMode << endl;
+        isReadFromBackup = !parseArgument(argumentString, "--readBackup=").empty();
+        cout << __func__ << "\t : Read Only Mode = " << isReadFromBackup << endl;
 
         string clientArg = parseArgument(argumentString, "--numClients=");
         if (!clientArg.empty()) {
@@ -250,7 +250,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < numClients; i++) {
         allReadTimes.push_back({});
         allWriteTimes.push_back({});
-        ourClients.push_back(new Client(addresses, isCachingEnabled, i, isReadOnlyMode));    
+        ourClients.push_back(new Client(addresses, isCachingEnabled, i, isReadFromBackup));
     }
     vector<thread> threads;
     for (int i = 0; i < numClients; i++) {
@@ -258,7 +258,7 @@ int main(int argc, char *argv[]) {
             threads.push_back(thread(&Client::run_application_crashTesting, ourClients[i], 10));
         }
         else {
-            threads.push_back(thread(&Client::run_application_cachedTesting, ourClients[i], 50));
+            threads.push_back(thread(&Client::run_application_loadTesting, ourClients[i], 1000));
         }
     }
     for (int i = 0; i < numClients; i++) {
@@ -354,6 +354,86 @@ int Client::run_application(int NUM_RUNS = 50) {
         if ((!readFromBackup) && (num_bytes_write != 4096) &&
             (debugMode <= DebugLevel::LevelError)) {
             printf("Didn't write 4k bytes to this file! Instead wrote %d bytes.\n", num_bytes_write);
+        }
+
+        msleep((int)dist6(rng));
+    }
+
+    return 0;
+}
+
+int Client::run_application_loadTesting(int NUM_RUNS = 50) {
+    const bool alignedAddress = true;
+
+    vector<pair<double, int>> &readTimes = allReadTimes[clientThreadId],
+                              &writeTimes = allWriteTimes[clientThreadId];
+
+    string write_data;
+
+    int totalBlocks = MAX_SIZE_BYTES / BLOCK_SIZE_BYTES;
+
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 20);
+
+    int maxAddressRange = (MAX_SIZE_BYTES - BLOCK_SIZE_BYTES);
+
+    std::uniform_int_distribution<std::mt19937::result_type> dist7(0, maxAddressRange);
+
+    for (int i = 0; i < NUM_RUNS; i++) {
+        string buf;
+        uint32_t address = (int)dist7(rng);
+
+        if (alignedAddress) {
+            address = (address / BLOCK_SIZE_BYTES) * BLOCK_SIZE_BYTES;
+        }
+        
+        struct timespec read_start, read_end;
+        get_time(&read_start);
+        int num_bytes_read = client_read(address, buf);
+        get_time(&read_end);
+        readTimes.push_back(make_pair(get_time_diff(&read_start, &read_end), address));
+
+        if ((num_bytes_read != 4096) && (debugMode <= DebugLevel::LevelError)) {
+            printf(
+                "Didn't read 4k bytes from this file! Instead read %d bytes!\n",
+                num_bytes_read);
+        }
+
+        getRandomText(write_data, BLOCK_SIZE_BYTES);
+
+        msleep((int)dist6(rng));
+
+        struct timespec write_start, write_end;
+        get_time(&write_start);
+
+        int num_bytes_write = 0;
+
+        num_bytes_write = client_write(address, write_data);
+
+        get_time(&write_end);
+        writeTimes.push_back(
+            make_pair(get_time_diff(&write_start, &write_end), address));
+
+        if ((num_bytes_write != 4096) &&
+            (debugMode <= DebugLevel::LevelError)) {
+            printf("Didn't write 4k bytes to this file! Instead wrote %d bytes.\n", num_bytes_write);
+        }
+
+        msleep((int)dist6(rng));
+
+        get_time(&read_start);
+
+        num_bytes_read = client_read(address, buf);
+
+        get_time(&read_end);
+        readTimes.push_back(
+            make_pair(get_time_diff(&read_start, &read_end), address));
+
+        if ((num_bytes_read != 4096) && (debugMode <= DebugLevel::LevelError)) {
+            printf(
+                "Didn't read 4k bytes from this file! Instead read %d bytes!\n",
+                num_bytes_read);
         }
 
         msleep((int)dist6(rng));

@@ -294,6 +294,7 @@ class Client {
     int run_application_cachedTesting(int NUM_RUNS);
     int run_application_readOnly(int NUM_RUNS);
     int run_application_writeOnly(int NUM_RUNS);
+    int run_application_loadTesting(int NUM_RUNS);
     int run_application_crashTesting(int NUM_RUNS);
 
     int client_read(uint32_t offset, string &buf);
